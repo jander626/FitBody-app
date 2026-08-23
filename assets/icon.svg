@@ -1,0 +1,9 @@
+<!-- Fuente de los iconos de la PWA. Regenerar los PNG con `npm run iconos`. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" fill="#C77A1E"/>
+  <!-- Anillo de calorías: el mismo gesto que la pantalla Hoy.
+       Todo el contenido vive dentro del 80% central, la zona segura maskable. -->
+  <circle cx="256" cy="256" r="126" fill="none" stroke="#F6F5F2" stroke-opacity="0.28" stroke-width="40"/>
+  <path d="M256 130 a126 126 0 1 1 -89.1 215.1" fill="none" stroke="#F6F5F2" stroke-width="40" stroke-linecap="round"/>
+  <circle cx="256" cy="256" r="52" fill="#F6F5F2"/>
+</svg>

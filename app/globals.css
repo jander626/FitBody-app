@@ -1,0 +1,99 @@
+@import "tailwindcss";
+
+/* Paleta heredada del dashboard de fitfood, para que la app se sienta
+   continuación de la bitácora y no una herramienta distinta. */
+:root {
+  --ground: #f6f5f2;
+  --surface: #ffffff;
+  --ink: #16181a;
+  --ink-2: #4a4842;
+  --muted: #6b6862;
+  --hairline: #e3e0d9;
+  --hairline-soft: #efede7;
+  --accent: #c77a1e;
+  --accent-soft: rgba(199, 122, 30, 0.13);
+  --good: #2f7a52;
+  --good-bg: rgba(47, 122, 82, 0.12);
+  --warn: #96601a;
+  --warn-bg: rgba(150, 96, 26, 0.12);
+  --bad: #9a3412;
+  --bad-bg: rgba(154, 52, 18, 0.12);
+  --shadow: 0 1px 2px rgba(20, 18, 12, 0.05), 0 6px 18px rgba(20, 18, 12, 0.05);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ground: #14161a;
+    --surface: #1b1e23;
+    --ink: #e7e5e0;
+    --ink-2: #b6b2a9;
+    --muted: #8d8a82;
+    --hairline: #2a2e34;
+    --hairline-soft: #23272c;
+    --accent: #c4831f;
+    --accent-soft: rgba(196, 131, 31, 0.2);
+    --good: #5fa37b;
+    --good-bg: rgba(95, 163, 123, 0.16);
+    --warn: #c0913f;
+    --warn-bg: rgba(192, 145, 63, 0.15);
+    --bad: #d4785a;
+    --bad-bg: rgba(212, 120, 90, 0.15);
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 18px rgba(0, 0, 0, 0.25);
+  }
+}
+
+@theme inline {
+  --color-ground: var(--ground);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-muted: var(--muted);
+  --color-hairline: var(--hairline);
+  --color-hairline-soft: var(--hairline-soft);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-good: var(--good);
+  --color-good-bg: var(--good-bg);
+  --color-warn: var(--warn);
+  --color-warn-bg: var(--warn-bg);
+  --color-bad: var(--bad);
+  --color-bad-bg: var(--bad-bg);
+  --font-sans: var(--font-sans-stack);
+  --font-serif: Georgia, "Iowan Old Style", "Times New Roman", serif;
+  --font-mono: var(--font-mono-stack);
+}
+
+html {
+  --font-sans-stack: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    Helvetica, Arial, sans-serif;
+  --font-mono-stack: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    monospace;
+  /* La PWA vive a pantalla completa: que el rebote no muestre otro color. */
+  background: var(--ground);
+}
+
+body {
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-sans-stack);
+  /* Evita el zoom accidental al hacer doble tap en los steppers de porción. */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Respeta el notch y la barra de gestos cuando corre instalada. */
+.safe-top {
+  padding-top: env(safe-area-inset-top);
+}
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

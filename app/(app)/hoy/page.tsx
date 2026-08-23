@@ -1,8 +1,19 @@
-export default function Hoy() {
-  return (
-    <main className="mx-auto max-w-md px-5 py-8">
-      <h1 className="font-serif text-2xl text-ink">Hoy</h1>
-      <p className="mt-2 text-sm text-muted">Pendiente: F2.</p>
-    </main>
-  );
+import { redirect } from "next/navigation";
+import { fechaDeHoy, obtenerDia } from "@/lib/datos/diario";
+import { usuarioActual } from "@/lib/supabase/cliente-servidor";
+import { VistaHoy } from "./vista";
+
+export const metadata = { title: "Hoy — FitFood" };
+
+export default async function Hoy(props: PageProps<"/hoy">) {
+  const usuario = await usuarioActual();
+  if (!usuario) redirect("/login");
+
+  const { fecha } = await props.searchParams;
+  const hoy = fechaDeHoy();
+  // Permite mirar días anteriores con ?fecha=AAAA-MM-DD sin abrir otra pantalla.
+  const dia =
+    typeof fecha === "string" && /^\d{4}-\d{2}-\d{2}$/.test(fecha) ? fecha : hoy;
+
+  return <VistaHoy dia={await obtenerDia(usuario.id, dia)} esHoy={dia === hoy} />;
 }

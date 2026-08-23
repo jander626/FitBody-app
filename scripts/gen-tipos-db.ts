@@ -33,12 +33,47 @@ select json_agg(t order by t.tabla, t.posicion) from (
 ) t;
 `;
 
+/**
+ * Claves foráneas, para poblar `Relationships`. No es decorativo: postgrest-js
+ * lo exige en cada tabla (sin él, todo el `Database` colapsa a `never` y las
+ * consultas dejan de tipar), y además habilita el tipado de los joins.
+ */
+const CONSULTA_FKS = `
+select coalesce(json_agg(t), '[]'::json) from (
+  select
+    con.conname                as nombre,
+    orig.relname               as tabla,
+    array_agg(ac.attname order by u.ord)      as columnas,
+    dest.relname               as tabla_destino,
+    array_agg(bc.attname order by u.ord)      as columnas_destino,
+    con.conkey                 as claves
+  from pg_constraint con
+  join pg_class orig on orig.oid = con.conrelid
+  join pg_class dest on dest.oid = con.confrelid
+  join pg_namespace n on n.oid = orig.relnamespace
+  join unnest(con.conkey) with ordinality as u(attnum, ord) on true
+  join pg_attribute ac on ac.attrelid = con.conrelid  and ac.attnum = u.attnum
+  join unnest(con.confkey) with ordinality as w(attnum, ord) on w.ord = u.ord
+  join pg_attribute bc on bc.attrelid = con.confrelid and bc.attnum = w.attnum
+  where con.contype = 'f' and n.nspname = 'public'
+  group by con.conname, orig.relname, dest.relname, con.conkey
+) t;
+`;
+
 interface Columna {
   tabla: string;
   columna: string;
   tipo: string;
   anulable: boolean;
   tiene_default: boolean;
+}
+
+interface ClaveForanea {
+  nombre: string;
+  tabla: string;
+  columnas: string[];
+  tabla_destino: string;
+  columnas_destino: string[];
 }
 
 /** Mapea tipos de Postgres a TypeScript. Lo que no reconoce, lo dice. */
@@ -74,10 +109,10 @@ function aTipoTS(pg: string): string {
   }
 }
 
-function consultar(): Columna[] {
+function consultar<T>(sql: string): T {
   const salida = execFileSync(
     "psql",
-    ["-tAc", CONSULTA, process.env.PGDATABASE ?? "fitfood_types"],
+    ["-tAc", sql, process.env.PGDATABASE ?? "fitfood_types"],
     {
       encoding: "utf8",
       env: {
@@ -90,10 +125,16 @@ function consultar(): Columna[] {
   ).trim();
 
   if (!salida) throw new Error("El catálogo vino vacío: ¿aplicaste las migraciones?");
-  return JSON.parse(salida) as Columna[];
+  return JSON.parse(salida) as T;
 }
 
-function generar(columnas: Columna[]): string {
+/** psql serializa los array de Postgres como "{a,b}". */
+function aLista(valor: string[] | string): string[] {
+  if (Array.isArray(valor)) return valor;
+  return valor.replace(/^\{|\}$/g, "").split(",").filter(Boolean);
+}
+
+function generar(columnas: Columna[], fks: ClaveForanea[]): string {
   const porTabla = new Map<string, Columna[]>();
   for (const col of columnas) {
     const lista = porTabla.get(col.tabla) ?? [];
@@ -125,6 +166,21 @@ function generar(columnas: Columna[]): string {
         )
         .join("\n");
 
+      const relaciones = fks
+        .filter((fk) => fk.tabla === tabla)
+        .map((fk) => {
+          const cols = aLista(fk.columnas);
+          const dest = aLista(fk.columnas_destino);
+          return `          {
+            foreignKeyName: ${JSON.stringify(fk.nombre)};
+            columns: [${cols.map((c) => JSON.stringify(c)).join(", ")}];
+            isOneToOne: false;
+            referencedRelation: ${JSON.stringify(fk.tabla_destino)};
+            referencedColumns: [${dest.map((c) => JSON.stringify(c)).join(", ")}];
+          },`;
+        })
+        .join("\n");
+
       return `      ${tabla}: {
         Row: {
 ${fila}
@@ -135,6 +191,7 @@ ${insert}
         Update: {
 ${update}
         };
+        Relationships: [${relaciones ? `\n${relaciones}\n        ` : ""}];
       };`;
     })
     .join("\n");
@@ -164,7 +221,8 @@ ${bloques}
 `;
 }
 
-const columnas = consultar();
-writeFileSync(SALIDA, generar(columnas));
+const columnas = consultar<Columna[]>(CONSULTA);
+const fks = consultar<ClaveForanea[]>(CONSULTA_FKS);
+writeFileSync(SALIDA, generar(columnas, fks));
 const tablas = new Set(columnas.map((c) => c.tabla)).size;
 console.log(`✓ ${path.relative(RAIZ, SALIDA)} — ${tablas} tablas, ${columnas.length} columnas`);

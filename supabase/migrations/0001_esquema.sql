@@ -182,8 +182,11 @@ create table public.meal_logs (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   fecha date not null,
+  -- Los momentos salen de los que la bitácora usa de verdad. "snack tarde" se
+  -- normaliza a "snack" en la importación: la hora del día ya vive en `hora`.
   momento text not null
-    check (momento in ('desayuno', 'almuerzo', 'cena', 'snack', 'bebida', 'otro')),
+    check (momento in ('desayuno', 'almuerzo', 'cena', 'snack', 'postre',
+                       'bebida', 'otro')),
   hora time,
   confianza text check (confianza in ('alta', 'media', 'baja')),
   origen text not null default 'manual'
@@ -216,11 +219,19 @@ create table public.meal_log_items (
   carbs_g numeric(6,2) not null default 0 check (carbs_g >= 0),
   grasa_g numeric(6,2) not null default 0 check (grasa_g >= 0),
   nota_correccion text,
+  -- Notas del ítem que no son correcciones (de dónde salió la porción, cómo
+  -- estaba preparado). En la bitácora aparecen como nota, nota_porcion y
+  -- porcion_nota; acá viven en un solo campo.
+  nota text,
   orden integer not null default 0,
   creado_en timestamptz not null default now(),
-  -- Una porción se mide en gramos o en mililitros, no en ambos ni en ninguno.
-  constraint meal_log_items_una_porcion
-    check (num_nonnulls(porcion_g, porcion_ml) = 1)
+  -- Gramos o mililitros, nunca ambos. Puede no haber ninguno: hay ítems donde
+  -- la cantidad va en el nombre ("3 huevos") y otros donde no significa nada
+  -- ("agua", "café con endulzante"). En la bitácora eso pasa en 19 de 147
+  -- ítems, así que exigir una porción siempre sería exigirle a los datos algo
+  -- que no cumplen.
+  constraint meal_log_items_porcion_coherente
+    check (num_nonnulls(porcion_g, porcion_ml) <= 1)
 );
 
 create index meal_log_items_meal_log on public.meal_log_items (meal_log_id, orden);

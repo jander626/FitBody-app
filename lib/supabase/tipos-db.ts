@@ -61,6 +61,15 @@ export interface Database {
           creado_en?: string;
           actualizado_en?: string;
         };
+        Relationships: [
+          {
+            foreignKeyName: "foods_creado_por_fkey";
+            columns: ["creado_por"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       meal_log_items: {
         Row: {
@@ -76,6 +85,7 @@ export interface Database {
           carbs_g: number;
           grasa_g: number;
           nota_correccion: string | null;
+          nota: string | null;
           orden: number;
           creado_en: string;
         };
@@ -92,6 +102,7 @@ export interface Database {
           carbs_g?: number;
           grasa_g?: number;
           nota_correccion?: string | null;
+          nota?: string | null;
           orden?: number;
           creado_en?: string;
         };
@@ -108,9 +119,33 @@ export interface Database {
           carbs_g?: number;
           grasa_g?: number;
           nota_correccion?: string | null;
+          nota?: string | null;
           orden?: number;
           creado_en?: string;
         };
+        Relationships: [
+          {
+            foreignKeyName: "meal_log_items_food_id_fkey";
+            columns: ["food_id"];
+            isOneToOne: false;
+            referencedRelation: "foods";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "meal_log_items_meal_log_id_fkey";
+            columns: ["meal_log_id"];
+            isOneToOne: false;
+            referencedRelation: "meal_logs";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "meal_log_items_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       meal_logs: {
         Row: {
@@ -155,6 +190,22 @@ export interface Database {
           creado_en?: string;
           actualizado_en?: string;
         };
+        Relationships: [
+          {
+            foreignKeyName: "meal_logs_scan_session_id_fkey";
+            columns: ["scan_session_id"];
+            isOneToOne: false;
+            referencedRelation: "scan_sessions";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "meal_logs_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       profiles: {
         Row: {
@@ -187,6 +238,15 @@ export interface Database {
           creado_en?: string;
           actualizado_en?: string;
         };
+        Relationships: [
+          {
+            foreignKeyName: "profiles_id_fkey";
+            columns: ["id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       scan_sessions: {
         Row: {
@@ -219,6 +279,15 @@ export interface Database {
           creado_en?: string;
           actualizado_en?: string;
         };
+        Relationships: [
+          {
+            foreignKeyName: "scan_sessions_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       scan_turns: {
         Row: {
@@ -272,6 +341,22 @@ export interface Database {
           modelo?: string | null;
           creado_en?: string;
         };
+        Relationships: [
+          {
+            foreignKeyName: "scan_turns_session_id_fkey";
+            columns: ["session_id"];
+            isOneToOne: false;
+            referencedRelation: "scan_sessions";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "scan_turns_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       user_goals: {
         Row: {
@@ -319,6 +404,15 @@ export interface Database {
           motivo?: string | null;
           creado_en?: string;
         };
+        Relationships: [
+          {
+            foreignKeyName: "user_goals_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       weight_logs: {
         Row: {
@@ -351,6 +445,15 @@ export interface Database {
           creado_en?: string;
           actualizado_en?: string;
         };
+        Relationships: [
+          {
+            foreignKeyName: "weight_logs_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
       };
     };
     Views: Record<string, never>;

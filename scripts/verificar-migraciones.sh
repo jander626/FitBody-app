@@ -59,7 +59,39 @@ done
 echo "→ Probando el aislamiento entre usuarios"
 psql -v ON_ERROR_STOP=1 -q -d fitfood_test -f "$RAIZ/supabase/tests/01_rls.sql"
 
-echo "✓ Migraciones y RLS en verde"
+# Los tipos se versionan, así que pueden quedar desfasados de las migraciones
+# sin que nada se queje hasta que una consulta falla en producción. Acá se
+# regeneran y se comparan.
+echo "→ Comprobando que los tipos coincidan con el esquema"
+TIPOS="$RAIZ/lib/supabase/tipos-db.ts"
+cp "$TIPOS" "$PGDATA/tipos-antes.ts"
+PGDATABASE=fitfood_test npx tsx "$RAIZ/scripts/gen-tipos-db.ts" >/dev/null
+if ! diff -q "$PGDATA/tipos-antes.ts" "$TIPOS" >/dev/null; then
+  echo "✗ lib/supabase/tipos-db.ts está desfasado del esquema."
+  echo "  Ya se regeneró: revisá el diff y commiteálo."
+  diff "$PGDATA/tipos-antes.ts" "$TIPOS" | head -40
+  exit 1
+fi
+echo "   tipos al día"
+
+# Ensayo de la importación: se traduce la bitácora real con el mismo lector que
+# usa el importador y se inserta todo. Si algo no entra en el esquema, se ve
+# acá y no a mitad de una importación de verdad.
+BITACORA="${FITFOOD_REPO_PATH:-$RAIZ/../fitfood}"
+if [ -d "$BITACORA/data/comidas" ]; then
+  echo "→ Ensayando la importación de la bitácora ($BITACORA)"
+  psql -q -c "create database fitfood_import" postgres
+  psql -v ON_ERROR_STOP=1 -q -d fitfood_import -f "$RAIZ/supabase/tests/00_stub_supabase.sql"
+  for f in "$RAIZ"/supabase/migrations/*.sql; do
+    psql -v ON_ERROR_STOP=1 -q -d fitfood_import -f "$f"
+  done
+  FITFOOD_REPO_PATH="$BITACORA" npx tsx "$RAIZ/scripts/importacion-a-sql.ts" > "$PGDATA/import.sql"
+  psql -v ON_ERROR_STOP=1 -q -d fitfood_import -f "$PGDATA/import.sql"
+else
+  echo "→ Sin clon de la bitácora en $BITACORA: se salta el ensayo de importación"
+fi
+
+echo "✓ Migraciones, RLS e importación en verde"
 
 if [ "$DEJAR_VIVO" -eq 1 ]; then
   cat <<FIN

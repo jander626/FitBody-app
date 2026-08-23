@@ -6,6 +6,8 @@
  * "foto (menu) + confirmacion del usuario"— y esas hay que poder probarlas
  * sin levantar una base.
  */
+import { normalizar } from "../texto";
+
 
 /** Momentos que acepta el esquema. */
 export type Momento =
@@ -21,26 +23,9 @@ export type Confianza = "alta" | "media" | "baja";
 
 export type Origen = "foto" | "descripcion" | "foto+descripcion" | "manual";
 
-/** Minúsculas, sin acentos, sin puntuación. Para comparar nombres. */
-export function normalizar(texto: string): string {
-  return texto
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "")
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
-}
-
-/** Identificador estable y corto para un alimento. */
-export function slugificar(nombre: string): string {
-  return nombre
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "");
-}
+// normalizar y slugificar viven en lib/texto.ts: los usa también el buscador
+// en el navegador, y no tiene por qué arrastrar el código del importador.
+export { normalizar, slugificar } from "../texto";
 
 /**
  * Normaliza el momento de la comida.

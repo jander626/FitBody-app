@@ -1,8 +1,27 @@
-export default function Registrar() {
+import { redirect } from "next/navigation";
+import { Encabezado } from "@/components/ui";
+import { listarAlimentos } from "@/lib/datos/alimentos";
+import { fechaDeHoy } from "@/lib/datos/diario";
+import { usuarioActual } from "@/lib/supabase/cliente-servidor";
+import { RegistroManual } from "./manual";
+
+export const metadata = { title: "Registrar — FitFood" };
+
+export default async function Registrar() {
+  const usuario = await usuarioActual();
+  if (!usuario) redirect("/login");
+
+  const alimentos = await listarAlimentos();
+
   return (
-    <main className="px-5 py-8">
-      <h1 className="font-serif text-2xl text-ink">Registrar</h1>
-      <p className="mt-2 text-sm text-muted">Pendiente.</p>
-    </main>
+    <>
+      <Encabezado
+        titulo="Registrar"
+        bajada="Buscá en la tabla y ajustá la porción. Los números salen de la tabla, no de una estimación."
+      />
+      <div className="px-5">
+        <RegistroManual alimentos={alimentos} fecha={fechaDeHoy()} />
+      </div>
+    </>
   );
 }

@@ -9,6 +9,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:db": "./scripts/verificar-migraciones.sh",
     "test:watch": "vitest",
     "iconos": "tsx scripts/build-icons.ts",
     "import": "tsx scripts/import-fitfood.ts",

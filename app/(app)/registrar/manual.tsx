@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Aviso, Tarjeta, TituloSeccion, claseControl } from "@/components/ui";
+import { EditorItems, type ItemEditable } from "@/components/editor-items";
 import {
   buscarAlimentos,
   macrosDePorcion,
@@ -18,27 +19,6 @@ import {
 } from "@/lib/registro/tipos";
 import { guardarComida } from "./acciones";
 
-/** Un ítem del borrador más lo necesario para recalcular al mover la porción. */
-interface EnBorrador extends ItemBorrador {
-  clave: string;
-  alimentoTabla: Alimento | null;
-}
-
-/** Deja solo lo que viaja al servidor: `clave` y `alimentoTabla` son de la UI. */
-function aItemBorrador(item: EnBorrador): ItemBorrador {
-  return {
-    foodId: item.foodId,
-    alimento: item.alimento,
-    porcionG: item.porcionG,
-    porcionMl: item.porcionMl,
-    kcal: item.kcal,
-    proteinaG: item.proteinaG,
-    carbsG: item.carbsG,
-    grasaG: item.grasaG,
-    nota: item.nota,
-  };
-}
-
 export function RegistroManual({
   alimentos,
   fecha,
@@ -51,7 +31,7 @@ export function RegistroManual({
   const [momento, setMomento] = useState(() =>
     momentoSugerido(new Date().getHours()),
   );
-  const [items, setItems] = useState<EnBorrador[]>([]);
+  const [items, setItems] = useState<ItemEditable[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [guardando, iniciarGuardado] = useTransition();
 
@@ -68,7 +48,6 @@ export function RegistroManual({
       ...previos,
       {
         clave: `${alimento.id}-${Date.now()}`,
-        alimentoTabla: alimento,
         foodId: alimento.id,
         alimento: alimento.nombre,
         porcionG: gramos,
@@ -80,24 +59,6 @@ export function RegistroManual({
     setConsulta("");
   }
 
-  /** Al mover la porción, los macros se recalculan desde la tabla. */
-  function cambiarPorcion(clave: string, gramos: number) {
-    setItems((previos) =>
-      previos.map((item) => {
-        if (item.clave !== clave || !item.alimentoTabla) return item;
-        return {
-          ...item,
-          porcionG: gramos,
-          ...macrosDePorcion(item.alimentoTabla, gramos),
-        };
-      }),
-    );
-  }
-
-  function quitar(clave: string) {
-    setItems((previos) => previos.filter((i) => i.clave !== clave));
-  }
-
   function guardar() {
     setError(null);
     iniciarGuardado(async () => {
@@ -105,7 +66,8 @@ export function RegistroManual({
         fecha,
         momento,
         origen: "manual",
-        confianza: "alta", // Elegido de la tabla y pesado: no hay estimación.
+        // Elegido de la tabla y con la porción puesta a mano: no hay estimación.
+        confianza: "alta",
         corregido: false,
         nota: null,
         scanSessionId: null,
@@ -116,7 +78,6 @@ export function RegistroManual({
         setError(resultado.error);
         return;
       }
-
       setItems([]);
       router.push("/hoy");
     });
@@ -128,16 +89,11 @@ export function RegistroManual({
         <div>
           <TituloSeccion>Por guardar</TituloSeccion>
           <Tarjeta>
-            <div className="space-y-3">
-              {items.map((item) => (
-                <FilaBorrador
-                  key={item.clave}
-                  item={item}
-                  onPorcion={(g) => cambiarPorcion(item.clave, g)}
-                  onQuitar={() => quitar(item.clave)}
-                />
-              ))}
-            </div>
+            <EditorItems
+              items={items}
+              alimentos={alimentos}
+              onCambiar={setItems}
+            />
 
             <div className="mt-3 flex items-baseline justify-between border-t border-hairline-soft pt-3">
               <span className="text-sm text-ink-2">Total</span>
@@ -222,8 +178,8 @@ export function RegistroManual({
 
         {resultados.length === 0 && (
           <p className="mt-3 text-sm text-muted">
-            Nada con «{consulta}» en la tabla. Podés registrarlo por texto o por
-            foto, y queda estimado.
+            Nada con «{consulta}» en la tabla. Registralo por foto o por texto y
+            queda estimado.
           </p>
         )}
       </div>
@@ -231,47 +187,17 @@ export function RegistroManual({
   );
 }
 
-function FilaBorrador({
-  item,
-  onPorcion,
-  onQuitar,
-}: {
-  item: EnBorrador;
-  onPorcion: (gramos: number) => void;
-  onQuitar: () => void;
-}) {
-  return (
-    <div>
-      <div className="flex items-start justify-between gap-3">
-        <span className="min-w-0 text-sm text-ink">{item.alimento}</span>
-        <button
-          type="button"
-          onClick={onQuitar}
-          aria-label={`Quitar ${item.alimento}`}
-          className="shrink-0 text-xs text-muted underline underline-offset-4"
-        >
-          Quitar
-        </button>
-      </div>
-
-      <div className="mt-1.5 flex items-center gap-2">
-        <input
-          type="number"
-          min={1}
-          max={5000}
-          step={5}
-          inputMode="numeric"
-          value={item.porcionG ?? 0}
-          onChange={(e) => onPorcion(Number(e.target.value) || 0)}
-          aria-label={`Gramos de ${item.alimento}`}
-          className="w-24 rounded-lg border border-hairline bg-surface px-2.5 py-1.5 text-sm text-ink tabular-nums outline-none focus:border-accent"
-        />
-        <span className="text-xs text-muted">g</span>
-        <span className="ml-auto font-mono text-xs text-muted tabular-nums">
-          {Math.round(item.kcal)} kcal · {Math.round(item.proteinaG)}P{" "}
-          {Math.round(item.carbsG)}C {Math.round(item.grasaG)}G
-        </span>
-      </div>
-    </div>
-  );
+/** Deja solo lo que viaja al servidor: `clave` es de la UI. */
+function aItemBorrador(item: ItemEditable): ItemBorrador {
+  return {
+    foodId: item.foodId,
+    alimento: item.alimento,
+    porcionG: item.porcionG,
+    porcionMl: item.porcionMl,
+    kcal: item.kcal,
+    proteinaG: item.proteinaG,
+    carbsG: item.carbsG,
+    grasaG: item.grasaG,
+    nota: item.nota,
+  };
 }

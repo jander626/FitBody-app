@@ -1,8 +1,24 @@
-export default function Perfil() {
+import { redirect } from "next/navigation";
+import { gastoDelMes, obtenerEstadoPerfil } from "@/lib/datos/perfil";
+import { usuarioActual } from "@/lib/supabase/cliente-servidor";
+import { VistaPerfil } from "./vista";
+
+export const metadata = { title: "Perfil — FitFood" };
+
+export default async function Perfil() {
+  const usuario = await usuarioActual();
+  if (!usuario) redirect("/login");
+
+  const [estado, gasto] = await Promise.all([
+    obtenerEstadoPerfil(usuario.id),
+    gastoDelMes(usuario.id),
+  ]);
+
   return (
-    <main className="px-5 py-8">
-      <h1 className="font-serif text-2xl text-ink">Perfil</h1>
-      <p className="mt-2 text-sm text-muted">Pendiente.</p>
-    </main>
+    <VistaPerfil
+      estado={estado}
+      gasto={gasto}
+      tope={Number(process.env.FITFOOD_TOPE_MENSUAL_USD ?? 10)}
+    />
   );
 }

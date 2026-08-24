@@ -13,7 +13,7 @@
     "test:watch": "vitest",
     "iconos": "tsx scripts/build-icons.ts",
     "import": "tsx scripts/import-fitfood.ts",
-    "eval": "tsx scripts/eval-registro.ts"
+    "eval": "tsx --tsconfig tsconfig.scripts.json scripts/eval-registro.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.120.0",

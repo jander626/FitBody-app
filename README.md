@@ -45,10 +45,13 @@ FITFOOD_REPO_PATH=../fitfood npm run import
 |---|---|
 | `npm run dev` | Servidor de desarrollo |
 | `npm run build` | Build de producción |
-| `npm test` | Tests (motor de nutrición, guardrails, importación) |
-| `npm run typecheck` | `tsc --noEmit` |
+| `npm test` | Tests (motor, guardrails, importación, normalización, métricas) |
+| `npm run test:db` | Levanta un Postgres desechable, aplica las migraciones, prueba el aislamiento RLS y ensaya la importación |
+| `npm run typecheck` | `next typegen && tsc --noEmit` |
+| `npm run lint` | ESLint |
 | `npm run import` | Importa la bitácora de fitfood a Supabase |
-| `npm run eval` | Mide la precisión del registro contra los datos históricos |
+| `npm run eval -- --texto` | Mide la precisión contra los datos históricos (gasta API) |
+| `npm run eval -- --texto --dry` | Lo mismo, sin llamar a la API: para revisar el montaje |
 | `npm run iconos` | Regenera los PNG de la PWA desde `assets/icon.svg` |
 
 ## Estructura

@@ -1,8 +1,15 @@
-export default function Peso() {
-  return (
-    <main className="px-5 py-8">
-      <h1 className="font-serif text-2xl text-ink">Peso</h1>
-      <p className="mt-2 text-sm text-muted">Pendiente.</p>
-    </main>
-  );
+import { redirect } from "next/navigation";
+import { fechaDeHoy } from "@/lib/datos/diario";
+import { obtenerEstadoPeso } from "@/lib/datos/peso";
+import { usuarioActual } from "@/lib/supabase/cliente-servidor";
+import { VistaPeso } from "./vista";
+
+export const metadata = { title: "Peso — FitFood" };
+
+export default async function Peso() {
+  const usuario = await usuarioActual();
+  if (!usuario) redirect("/login");
+
+  const hoy = fechaDeHoy();
+  return <VistaPeso estado={await obtenerEstadoPeso(usuario.id, hoy)} fecha={hoy} />;
 }

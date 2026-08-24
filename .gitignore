@@ -49,3 +49,6 @@ next-env.d.ts
 *.jpg
 *.jpeg
 *.heic
+
+# SQL generado para pegar en Supabase: es una salida, no fuente
+/sql-para-supabase/

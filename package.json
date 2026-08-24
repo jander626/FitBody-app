@@ -13,6 +13,7 @@
     "test:watch": "vitest",
     "iconos": "tsx scripts/build-icons.ts",
     "import": "tsx scripts/import-fitfood.ts",
+    "sql": "tsx --tsconfig tsconfig.scripts.json scripts/generar-sql-importacion.ts",
     "eval": "tsx --tsconfig tsconfig.scripts.json scripts/eval-registro.ts"
   },
   "dependencies": {

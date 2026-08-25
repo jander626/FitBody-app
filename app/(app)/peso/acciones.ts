@@ -20,37 +20,52 @@ export async function guardarPeso(
   _previo: Resultado | null,
   datos: FormData,
 ): Promise<Resultado> {
-  const supabase = await clienteServidor();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false, error: "La sesión venció. Entrá de nuevo." };
+  // Todo va dentro del try a propósito. Si esto lanza —la red se cortó, o
+  // Supabase no contesta— la pantalla se cae entera y quien estaba pesándose
+  // pierde lo que escribió y no sabe si quedó guardado. Devolver el error lo
+  // deja donde estaba, con su número intacto y un botón para reintentar.
+  try {
+    const supabase = await clienteServidor();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return { ok: false, error: "La sesión venció. Entrá de nuevo." };
 
-  const analisis = PesoSchema.safeParse(Object.fromEntries(datos));
-  if (!analisis.success) {
+    const analisis = PesoSchema.safeParse(Object.fromEntries(datos));
+    if (!analisis.success) {
+      return {
+        ok: false,
+        error: `Revisá el peso: ${analisis.error.issues[0].message}`,
+      };
+    }
+
+    const { pesoKg, fecha, condiciones } = analisis.data;
+
+    const { error } = await supabase.from("weight_logs").upsert(
+      {
+        user_id: user.id,
+        fecha,
+        peso_kg: pesoKg,
+        condiciones: condiciones?.trim() || null,
+      },
+      { onConflict: "user_id,fecha" },
+    );
+
+    if (error) return { ok: false, error: error.message };
+
+    revalidatePath("/peso");
+    revalidatePath("/perfil");
+    revalidatePath("/historial");
+    return { ok: true, mensaje: `Peso de hoy: ${pesoKg} kg.` };
+  } catch (err) {
     return {
       ok: false,
-      error: `Revisá el peso: ${analisis.error.issues[0].message}`,
+      error:
+        err instanceof Error
+          ? `No se pudo guardar: ${err.message}`
+          : "No se pudo guardar. Probá de nuevo.",
     };
   }
-
-  const { pesoKg, fecha, condiciones } = analisis.data;
-
-  const { error } = await supabase.from("weight_logs").upsert(
-    {
-      user_id: user.id,
-      fecha,
-      peso_kg: pesoKg,
-      condiciones: condiciones?.trim() || null,
-    },
-    { onConflict: "user_id,fecha" },
-  );
-
-  if (error) return { ok: false, error: error.message };
-
-  revalidatePath("/peso");
-  revalidatePath("/perfil");
-  return { ok: true, mensaje: `Peso de hoy: ${pesoKg} kg.` };
 }
 
 /**

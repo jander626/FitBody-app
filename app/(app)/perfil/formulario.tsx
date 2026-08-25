@@ -1,7 +1,9 @@
 "use client";
 
 import { useActionState } from "react";
+import Link from "next/link";
 import { Aviso, Campo, claseControl } from "@/components/ui";
+import { actividadDeFactor, metaDeObjetivo } from "@/lib/nutrition/metas";
 import type { Objetivo, Perfil } from "@/lib/datos/perfil";
 import { guardarPerfil, type ResultadoGuardar } from "./acciones";
 
@@ -18,6 +20,15 @@ export function FormularioPerfil({
     ResultadoGuardar | null,
     FormData
   >(guardarPerfil, null);
+
+  // Los valores del plan: se muestran, no se editan. Los valores por defecto
+  // son los mismos que traía el formulario cuando se escribían a mano, para
+  // que alguien sin objetivo guardado no quede con el plan en blanco.
+  const factorActividad = objetivo?.factorActividad ?? 1.375;
+  const deficitPct = objetivo?.deficitPct ?? 20;
+  const objetivoActual = objetivo?.objetivo ?? "perder_grasa";
+  const nivel = actividadDeFactor(factorActividad);
+  const meta = metaDeObjetivo(objetivoActual, deficitPct);
 
   return (
     <form action={accion} className="space-y-4">
@@ -76,54 +87,61 @@ export function FormularioPerfil({
         </Campo>
       </div>
 
-      <Campo
-        etiqueta="Factor de actividad"
-        ayuda="1.2 sedentario · 1.375 ligero · 1.55 moderado · 1.725 activo. Si tenés pasos reales del reloj, un valor intermedio es más fiel que el escalón más cercano."
-      >
-        <input
-          name="factorActividad"
-          type="number"
-          required
-          min={1}
-          max={2.5}
-          step={0.01}
-          inputMode="decimal"
-          defaultValue={objetivo?.factorActividad ?? 1.375}
-          className={claseControl}
-        />
-      </Campo>
+      {/*
+        El plan es de solo lectura acá: lo fija la encuesta.
 
-      <Campo etiqueta="Objetivo">
-        <select
-          name="objetivo"
-          required
-          defaultValue={objetivo?.objetivo ?? "perder_grasa"}
-          className={claseControl}
-        >
-          <option value="perder_grasa">Perder grasa</option>
-          <option value="mantener">Mantener</option>
-          <option value="ganar_musculo">Ganar músculo</option>
-        </select>
-      </Campo>
+        Antes estos tres —factor, objetivo y déficit— se escribían a mano, y
+        eso permitía mezclas incoherentes: poner "Mantener" dejando el factor
+        que había calculado "ganar músculo". Con dos editores del mismo número
+        no hay forma de saber cuál manda.
+
+        La división ahora es: la encuesta fija el plan, el formulario los
+        hechos sobre vos. Los valores viajan igual en campos ocultos, para que
+        guardar los datos no borre el objetivo.
+      */}
+      <div className="rounded-xl border border-hairline-soft bg-ground px-3.5 py-3">
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="text-sm font-medium text-ink-2">Tu plan</span>
+          <Link href="/objetivo" className="text-sm text-accent underline underline-offset-4">
+            Cambiar
+          </Link>
+        </div>
+
+        <dl className="mt-2 space-y-1 text-sm">
+          <div className="flex justify-between gap-3">
+            <dt className="text-muted">Meta</dt>
+            <dd className="text-ink">{meta.titulo}</dd>
+          </div>
+          <div className="flex justify-between gap-3">
+            <dt className="text-muted">Actividad</dt>
+            <dd className="text-right text-ink">
+              {nivel ? nivel.titulo : `Factor ${factorActividad}`}
+              {nivel && (
+                <span className="block text-xs text-muted">{nivel.detalle}</span>
+              )}
+            </dd>
+          </div>
+          <div className="flex justify-between gap-3">
+            <dt className="text-muted">
+              {deficitPct >= 0 ? "Déficit" : "Superávit"}
+            </dt>
+            <dd className="text-ink">{Math.abs(deficitPct)} %</dd>
+          </div>
+        </dl>
+
+        {!nivel && (
+          <p className="mt-2 text-xs text-muted">
+            Este factor no salió de la encuesta. Contestala para ponerle un
+            nivel y revisar si sigue siendo el que te corresponde.
+          </p>
+        )}
+
+        <input type="hidden" name="factorActividad" value={factorActividad} />
+        <input type="hidden" name="objetivo" value={objetivoActual} />
+        <input type="hidden" name="deficitPct" value={deficitPct} />
+      </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <Campo
-          etiqueta="Déficit (%)"
-          ayuda="Negativo para superávit."
-        >
-          <input
-            name="deficitPct"
-            type="number"
-            required
-            min={-30}
-            max={40}
-            step={1}
-            inputMode="numeric"
-            defaultValue={objetivo?.deficitPct ?? 20}
-            className={claseControl}
-          />
-        </Campo>
-
         <Campo etiqueta="Peso meta (kg)">
           <input
             name="pesoMetaKg"

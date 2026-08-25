@@ -9,6 +9,9 @@
 import { describe, expect, it } from "vitest";
 import {
   ACTIVIDADES,
+  actividadDeFactor,
+  metaDeObjetivo,
+  ritmoDeDeficit,
   METAS,
   ORDEN_ACTIVIDADES,
   ORDEN_METAS,
@@ -104,6 +107,52 @@ describe("traducir respuestas", () => {
   it("sin ritmo cae en el de la meta", () => {
     expect(parametrosDe({ meta: "bajar_grasa", actividad: "poco" }).deficitPct).toBe(20);
     expect(parametrosDe({ meta: "tonificar", actividad: "poco" }).deficitPct).toBe(10);
+  });
+});
+
+describe("de vuelta: del número guardado a las palabras", () => {
+  it("reconoce cada factor de la encuesta", () => {
+    for (const nivel of Object.values(ACTIVIDADES)) {
+      expect(actividadDeFactor(nivel.factor)?.id, nivel.id).toBe(nivel.id);
+    }
+  });
+
+  it("tolera el redondeo de la base", () => {
+    // La columna es numeric(4,2): 1.375 vuelve como 1.38, y una comparación
+    // exacta no encontraría nada.
+    expect(actividadDeFactor(1.38)?.id).toBe("poco");
+  });
+
+  it("un factor que no salió de la encuesta no recibe etiqueta", () => {
+    // Poner "Moderado" a un 1.45 importado sería mentir sobre de dónde salió.
+    expect(actividadDeFactor(1.45)).toBeNull();
+  });
+
+  it("distingue tonificar de bajar de peso por el déficit", () => {
+    // Comparten objetivo: el déficit es lo único que las separa.
+    expect(metaDeObjetivo("perder_grasa", 20).id).toBe("bajar_grasa");
+    expect(metaDeObjetivo("perder_grasa", 10).id).toBe("tonificar");
+  });
+
+  it("nombra los otros dos objetivos", () => {
+    expect(metaDeObjetivo("mantener", 0).id).toBe("mantener");
+    expect(metaDeObjetivo("ganar_musculo", -12).id).toBe("ganar_musculo");
+  });
+
+  it("lo que entra por la encuesta vuelve a salir igual", () => {
+    // El viaje de ida y vuelta: si esto se rompe, Perfil muestra una meta
+    // distinta de la que se eligió.
+    for (const meta of ORDEN_METAS) {
+      const p = parametrosDe({ meta, actividad: "moderado" });
+      expect(metaDeObjetivo(p.objetivo, p.deficitPct).id, meta).toBe(meta);
+    }
+  });
+
+  it("reconoce los tres ritmos", () => {
+    for (const r of Object.values(RITMOS)) {
+      expect(ritmoDeDeficit(r.deficitPct)?.id, r.id).toBe(r.id);
+    }
+    expect(ritmoDeDeficit(17)).toBeNull();
   });
 });
 

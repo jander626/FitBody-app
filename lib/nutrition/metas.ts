@@ -225,6 +225,45 @@ export interface Parametros {
   opciones: Required<OpcionesPlan>;
 }
 
+// ------------------------------------------------------------ de vuelta ---
+
+/**
+ * El camino inverso: de un número guardado a las palabras que lo produjeron.
+ *
+ * Hace falta para mostrar en Perfil qué significa el factor sin volver a
+ * pedirlo. Devuelve null cuando el valor no salió de la encuesta —un objetivo
+ * importado de la bitácora, o un número puesto a mano antes de que la encuesta
+ * existiera—, y ahí la pantalla muestra el número crudo en vez de mentir con
+ * una etiqueta que no le corresponde.
+ */
+export function actividadDeFactor(factor: number): DefinicionActividad | null {
+  return (
+    Object.values(ACTIVIDADES).find(
+      // Con tolerancia: numeric(4,2) devuelve 1.375 como 1.38 y una
+      // comparación exacta no encontraría nada.
+      (nivel) => Math.abs(nivel.factor - factor) < 0.01,
+    ) ?? null
+  );
+}
+
+/** Lo mismo para el ritmo, entre las metas que lo preguntan. */
+export function ritmoDeDeficit(deficitPct: number): DefinicionRitmo | null {
+  return Object.values(RITMOS).find((r) => r.deficitPct === deficitPct) ?? null;
+}
+
+/** Cómo llamar a un objetivo guardado, en las palabras de la encuesta. */
+export function metaDeObjetivo(
+  objetivo: Objetivo,
+  deficitPct: number,
+): DefinicionMeta {
+  // perder_grasa cubre dos metas: la distingue el déficit, que es justamente
+  // lo único en que se diferencian.
+  if (objetivo === "perder_grasa") {
+    return deficitPct <= METAS.tonificar.deficitPct ? METAS.tonificar : METAS.bajar_grasa;
+  }
+  return objetivo === "mantener" ? METAS.mantener : METAS.ganar_musculo;
+}
+
 /** Las respuestas, convertidas en lo que el motor sabe usar. */
 export function parametrosDe(respuestas: Respuestas): Parametros {
   const meta = METAS[respuestas.meta];

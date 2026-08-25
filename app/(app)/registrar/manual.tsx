@@ -153,6 +153,13 @@ export function RegistroManual({
           className={`${claseControl} mt-0`}
         />
 
+        {consulta.trim() === "" && (
+          // Sin esto el orden se lee como un alfabético roto.
+          <p className="mt-2 px-1 text-xs text-muted">
+            De más a menos proteína por 100 g.
+          </p>
+        )}
+
         <ul className="mt-3 space-y-2">
           {resultados.map((alimento) => (
             <li key={alimento.id}>

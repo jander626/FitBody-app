@@ -120,6 +120,46 @@ describe("buscador", () => {
     expect(buscarAlimentos(TABLA, "   ").length).toBe(TABLA.length);
   });
 
+  it("sin consulta ordena de más a menos proteína", () => {
+    const p = buscarAlimentos(TABLA, "").map((a) => a.p100);
+    expect(p).toEqual([...p].sort((a, b) => b - a));
+    expect(p[0]).toBe(31); // pechuga de pollo
+  });
+
+  it("con el límite puesto, los primeros son los de más proteína", () => {
+    // El recorte no puede quedarse con tres cualesquiera.
+    expect(buscarAlimentos(TABLA, "", 3).map((a) => a.nombre)).toEqual([
+      "Pechuga de pollo sin piel",
+      "Muslo de pollo con piel",
+      "Huevo entero (frito/revuelto)",
+    ]);
+  });
+
+  it("no reordena la tabla que le pasan", () => {
+    // Es el mismo arreglo que usa el prompt de la IA: mutarlo acá lo cambiaría
+    // allá, y sin aviso.
+    const copia = [...TABLA];
+    buscarAlimentos(TABLA, "");
+    expect(TABLA).toEqual(copia);
+  });
+
+  it("con consulta manda la relevancia, no la proteína", () => {
+    // "arepa" tiene que traer la arepa aunque casi no tenga proteína.
+    expect(buscarAlimentos(TABLA, "arepa")[0].nombre).toBe(
+      "Arepa de maiz (media tela)",
+    );
+  });
+
+  it("a igual relevancia y largo, gana el de más proteína", () => {
+    const tabla = [
+      alimento("Yogur griego light", "Lacteo", 59, 10, 3.6, 0.4),
+      alimento("Yogur griego entero", "Lacteo", 97, 9, 3.9, 5),
+    ];
+    expect(buscarAlimentos(tabla, "yogur")[0].nombre).toBe(
+      "Yogur griego light",
+    );
+  });
+
   it("sin coincidencias devuelve vacío", () => {
     expect(buscarAlimentos(TABLA, "sushi")).toEqual([]);
   });

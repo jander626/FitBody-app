@@ -58,6 +58,12 @@ export function macrosDePorcion(
  * Cada palabra de la consulta tiene que aparecer en algún lado, en cualquier
  * orden: "pollo pechuga" encuentra "Pechuga de pollo sin piel". Los que
  * empiezan con la consulta van primero, que es lo que uno espera al escribir.
+ *
+ * Sin consulta, la lista va **de más a menos proteína**. Alfabético no dice
+ * nada cuando se está buscando con qué llegar al objetivo de proteína;
+ * ordenada así, la pantalla contesta sola la pregunta de todos los días.
+ * Cuando sí hay consulta manda la relevancia: quien escribe "arepa" quiere la
+ * arepa, no el alimento con más proteína que se llame parecido.
  */
 export function buscarAlimentos(
   alimentos: Alimento[],
@@ -65,7 +71,9 @@ export function buscarAlimentos(
   limite = 30,
 ): Alimento[] {
   const q = normalizar(consulta);
-  if (q.length === 0) return alimentos.slice(0, limite);
+  if (q.length === 0) {
+    return [...alimentos].sort(porProteina).slice(0, limite);
+  }
 
   const palabras = q.split(" ").filter(Boolean);
 
@@ -93,10 +101,21 @@ export function buscarAlimentos(
         // A igual relevancia, el nombre más corto suele ser el más genérico,
         // que es el que se busca cuando uno escribe poco.
         a.largo - b.largo ||
-        a.alimento.nombre.localeCompare(b.alimento.nombre),
+        porProteina(a.alimento, b.alimento),
     )
     .slice(0, limite)
     .map((m) => m.alimento);
+}
+
+/**
+ * De más a menos proteína por 100 g.
+ *
+ * El nombre desempata para que el orden sea estable: sin eso, dos alimentos
+ * con la misma proteína pueden intercambiarse entre renders y la lista
+ * "salta" sola delante de quien la está mirando.
+ */
+function porProteina(a: Alimento, b: Alimento): number {
+  return b.p100 - a.p100 || a.nombre.localeCompare(b.nombre, "es");
 }
 
 /** Porción por defecto al agregar un alimento: la típica, o 100 g. */

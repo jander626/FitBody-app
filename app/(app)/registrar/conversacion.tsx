@@ -53,6 +53,8 @@ export function Conversacion({
   );
   const [error, setError] = useState<string | null>(null);
   const [fueraDeTema, setFueraDeTema] = useState<string | null>(null);
+  /** La foto se estimó pero no se pudo archivar. Se avisa sin bloquear. */
+  const [fotoNoGuardada, setFotoNoGuardada] = useState(false);
   const [pensando, setPensando] = useState(false);
   const [guardando, iniciarGuardado] = useTransition();
 
@@ -99,6 +101,12 @@ export function Conversacion({
     try {
       const fotoPath =
         foto && !estimacion ? await subirFoto(foto.base64) : null;
+
+      // Que la foto no se archive no impide registrar la comida — el dato son
+      // los números. Pero tampoco puede pasar callado: si falla siempre (el
+      // bucket no existe, o falta una política), uno se entera meses después
+      // al abrir el diario y no encontrar ninguna imagen.
+      if (foto && !estimacion) setFotoNoGuardada(fotoPath === null);
 
       const respuesta = await fetch("/api/registro", {
         method: "POST",
@@ -208,9 +216,22 @@ export function Conversacion({
         />
 
         {foto ? (
-          <div className="relative overflow-hidden rounded-2xl border border-hairline">
+          <div className="relative overflow-hidden rounded-2xl border border-hairline bg-hairline-soft">
+            {/*
+              Con tope de altura: sin él, una foto vertical de celular ocupa la
+              pantalla entera y empuja el botón de estimar fuera de la vista.
+              Acá la foto se mira para confirmar que es la correcta, no para
+              estudiarla — eso pasa después, en la pantalla de corregir.
+
+              object-contain y no cover: recortar podría dejar fuera justo lo
+              que se quiere comprobar que salió en la foto.
+            */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={foto.url} alt="Foto de la comida" className="w-full" />
+            <img
+              src={foto.url}
+              alt="Foto de la comida"
+              className="max-h-[45vh] w-full object-contain"
+            />
             <button
               type="button"
               onClick={() => {
@@ -268,6 +289,17 @@ export function Conversacion({
     <div className="space-y-6">
       <div>
         <TituloSeccion>Estimación</TituloSeccion>
+
+        {fotoNoGuardada && (
+          <div className="mb-3">
+            <Aviso nivel="atencion">
+              La estimación salió bien, pero la foto no se pudo archivar: esta
+              comida va a quedar sin imagen en el diario. Suele ser que falta
+              configurar el almacenamiento en Supabase.
+            </Aviso>
+          </div>
+        )}
+
         <Tarjeta>
           <EditorItems
             items={items}

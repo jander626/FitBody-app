@@ -125,6 +125,23 @@ export function EditarComida({
       />
 
       <div className="space-y-6 px-5">
+        {comida.fotoUrl && (
+          <div>
+            <TituloSeccion>La foto</TituloSeccion>
+            {/*
+              Grande y arriba de todo: acá es donde de verdad sirve. Mirando el
+              plato se juzga si 200 g de pollo eran 200 g, que es la corrección
+              que más se hace y la que más mueve el número.
+            */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={comida.fotoUrl}
+              alt="La foto con la que se registró esta comida"
+              className="w-full rounded-2xl border border-hairline object-cover"
+            />
+          </div>
+        )}
+
         <div>
           <TituloSeccion>Lo que comiste</TituloSeccion>
           <Tarjeta>

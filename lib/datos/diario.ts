@@ -1,6 +1,7 @@
 import "server-only";
 
 import { clienteServidor } from "@/lib/supabase/cliente-servidor";
+import { urlsDeFotos } from "./fotos";
 
 export interface ItemDiario {
   id: string;
@@ -31,6 +32,14 @@ export interface ComidaDiario {
   origen: string;
   corregido: boolean;
   nota: string | null;
+  /**
+   * URL firmada de la foto, cuando la comida se registró con una.
+   *
+   * Vence en una hora: es una URL prestada, no una dirección fija. Null
+   * también cuando la foto existe pero no se pudo firmar — la comida y sus
+   * números valen igual sin la imagen.
+   */
+  fotoUrl: string | null;
   items: ItemDiario[];
   subtotal: Totales;
 }
@@ -83,6 +92,7 @@ export async function obtenerDia(userId: string, fecha: string): Promise<Dia> {
       .from("meal_logs")
       .select(
         `id, momento, hora, confianza, origen, corregido, nota,
+         scan_sessions ( foto_path ),
          meal_log_items (
            id, food_id, alimento, porcion_g, porcion_ml, kcal, proteina_g,
            carbs_g, grasa_g, nota_correccion, nota, orden
@@ -98,6 +108,12 @@ export async function obtenerDia(userId: string, fecha: string): Promise<Dia> {
       .eq("activo", true)
       .maybeSingle(),
   ]);
+
+  // Las fotos se firman todas de una: son cuatro o cinco por día, y firmarlas
+  // de a una serían cinco viajes más para pintar la misma pantalla.
+  const fotos = await urlsDeFotos(
+    (comidasRes.data ?? []).map((c) => c.scan_sessions?.foto_path),
+  );
 
   const comidas: ComidaDiario[] = (comidasRes.data ?? [])
     .map((c) => {
@@ -125,6 +141,7 @@ export async function obtenerDia(userId: string, fecha: string): Promise<Dia> {
         origen: c.origen,
         corregido: c.corregido,
         nota: c.nota,
+        fotoUrl: fotos.get(c.scan_sessions?.foto_path ?? "") ?? null,
         items,
         // El subtotal se calcula desde los ítems en vez de guardarse: un
         // subtotal almacenado se desincroniza en cuanto se edita un ítem.
@@ -175,6 +192,7 @@ export async function obtenerComida(
     .from("meal_logs")
     .select(
       `id, fecha, momento, hora, confianza, origen, corregido, nota,
+       scan_sessions ( foto_path ),
        meal_log_items (
          id, food_id, alimento, porcion_g, porcion_ml, kcal, proteina_g,
          carbs_g, grasa_g, nota_correccion, nota, orden
@@ -185,6 +203,8 @@ export async function obtenerComida(
     .maybeSingle();
 
   if (!data) return null;
+
+  const fotos = await urlsDeFotos([data.scan_sessions?.foto_path]);
 
   const items: ItemDiario[] = [...(data.meal_log_items ?? [])]
     .sort((a, b) => a.orden - b.orden)
@@ -211,6 +231,7 @@ export async function obtenerComida(
     origen: data.origen,
     corregido: data.corregido,
     nota: data.nota,
+    fotoUrl: fotos.get(data.scan_sessions?.foto_path ?? "") ?? null,
     items,
     subtotal: sumar(items),
   };

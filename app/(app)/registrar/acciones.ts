@@ -100,13 +100,27 @@ export async function guardarComida(
   };
 }
 
-/** Borra una comida del diario. El borrado en cascada se lleva los ítems. */
+/**
+ * Borra una comida del diario. El borrado en cascada se lleva los ítems.
+ *
+ * También se lleva la foto. Sin esto, borrar una comida dejaba la imagen en
+ * el almacenamiento para siempre: alguien que borra el registro de lo que
+ * comió no espera que la foto del plato siga guardada.
+ */
 export async function borrarComida(comidaId: string): Promise<ResultadoGuardar> {
   const supabase = await clienteServidor();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "La sesión venció. Entrá de nuevo." };
+
+  // La ruta hay que leerla antes: después del borrado ya no hay de dónde.
+  const { data: previa } = await supabase
+    .from("meal_logs")
+    .select("scan_sessions ( foto_path )")
+    .eq("id", comidaId)
+    .eq("user_id", user.id)
+    .maybeSingle();
 
   const { error } = await supabase
     .from("meal_logs")
@@ -115,6 +129,12 @@ export async function borrarComida(comidaId: string): Promise<ResultadoGuardar> 
     .eq("user_id", user.id);
 
   if (error) return { ok: false, error: error.message };
+
+  // Va después del borrado y sin comprobar el resultado a propósito: si esto
+  // falla, la comida ya no está y el diario quedó bien. Una foto suelta es un
+  // problema de limpieza, no algo que deba hacer fallar el borrado.
+  const rutaFoto = previa?.scan_sessions?.foto_path;
+  if (rutaFoto) await supabase.storage.from("comidas").remove([rutaFoto]);
 
   revalidatePath("/hoy");
   revalidatePath("/historial");

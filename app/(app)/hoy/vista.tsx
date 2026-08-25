@@ -168,19 +168,34 @@ export function VistaHoy({
 function TarjetaComida({ comida }: { comida: ComidaDiario }) {
   return (
     <Tarjeta>
-      <div className="flex items-baseline justify-between gap-3">
-        <h3 className="font-medium text-ink">
-          {NOMBRE_MOMENTO[comida.momento] ?? comida.momento}
-          {comida.hora && (
-            <span className="ml-2 text-xs font-normal text-muted">
-              {comida.hora.slice(0, 5)}
-            </span>
-          )}
-        </h3>
-        <span className="font-mono text-sm text-ink tabular-nums">
-          {Math.round(comida.subtotal.kcal)}
-          <span className="text-muted"> kcal</span>
-        </span>
+      <div className="flex items-start gap-3">
+        {comida.fotoUrl && (
+          // Chica y cuadrada: acá alcanza para reconocer el plato. La foto en
+          // grande va en la pantalla de corregir, que es donde hace falta
+          // mirarla para juzgar si la estimación fue razonable.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={comida.fotoUrl}
+            alt=""
+            loading="lazy"
+            className="size-12 shrink-0 rounded-lg object-cover"
+          />
+        )}
+
+        <div className="flex flex-1 items-baseline justify-between gap-3">
+          <h3 className="font-medium text-ink">
+            {NOMBRE_MOMENTO[comida.momento] ?? comida.momento}
+            {comida.hora && (
+              <span className="ml-2 text-xs font-normal text-muted">
+                {comida.hora.slice(0, 5)}
+              </span>
+            )}
+          </h3>
+          <span className="font-mono text-sm text-ink tabular-nums">
+            {Math.round(comida.subtotal.kcal)}
+            <span className="text-muted"> kcal</span>
+          </span>
+        </div>
       </div>
 
       <ul className="mt-2.5 space-y-1.5">

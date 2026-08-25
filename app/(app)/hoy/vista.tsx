@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Aviso, Tarjeta, TituloSeccion } from "@/components/ui";
+import { NavegacionDia } from "@/components/navegacion-dia";
 import { Medidor, estadoMacro, type EstadoMedidor } from "@/components/medidor";
 import type { ComidaDiario, Dia } from "@/lib/datos/diario";
 
@@ -32,7 +33,15 @@ function formatearPorcion(item: {
   return null;
 }
 
-export function VistaHoy({ dia, esHoy }: { dia: Dia; esHoy: boolean }) {
+export function VistaHoy({
+  dia,
+  esHoy,
+  hoy,
+}: {
+  dia: Dia;
+  esHoy: boolean;
+  hoy: string;
+}) {
   const { totales, objetivo, comidas } = dia;
 
   const restantes = objetivo ? objetivo.kcal - totales.kcal : null;
@@ -50,9 +59,7 @@ export function VistaHoy({ dia, esHoy }: { dia: Dia; esHoy: boolean }) {
           Va en la sans y con cifras proporcionales — la serif y las cifras
           tabulares son para los títulos y las columnas, no para esto. */}
       <header className="px-5 pt-8 pb-5">
-        <p className="text-sm text-muted">
-          {esHoy ? "Hoy" : dia.fecha}
-        </p>
+        <NavegacionDia fecha={dia.fecha} hoy={hoy} />
 
         {objetivo ? (
           <>

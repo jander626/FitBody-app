@@ -15,5 +15,11 @@ export default async function Hoy(props: PageProps<"/hoy">) {
   const dia =
     typeof fecha === "string" && /^\d{4}-\d{2}-\d{2}$/.test(fecha) ? fecha : hoy;
 
-  return <VistaHoy dia={await obtenerDia(usuario.id, dia)} esHoy={dia === hoy} />;
+  return (
+    <VistaHoy
+      dia={await obtenerDia(usuario.id, dia)}
+      esHoy={dia === hoy}
+      hoy={hoy}
+    />
+  );
 }

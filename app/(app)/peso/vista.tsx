@@ -45,7 +45,16 @@ export function VistaPeso({
             <input type="hidden" name="fecha" value={fecha} />
             <Campo
               etiqueta={pesoDeHoy !== null ? "Peso de hoy (ya registrado)" : "Peso de hoy"}
-              ayuda="En ayunas y en las mismas condiciones. Un segundo pesaje corrige al primero."
+              // Un valor rellenado se ve idéntico a uno guardado, y la
+              // diferencia estaba solo en la etiqueta y el botón — fácil de
+              // pasar por alto, y lleva a creer que se guardó cuando no.
+              ayuda={
+                pesoDeHoy !== null
+                  ? "En ayunas y en las mismas condiciones. Un segundo pesaje corrige al primero."
+                  : ultimo
+                    ? `Todavía sin registrar. El ${ultimo.fecha.slice(5)} pesaste ${ultimo.pesoKg} kg: cambialo y tocá Guardar.`
+                    : "En ayunas y en las mismas condiciones."
+              }
             >
               <input
                 name="pesoKg"

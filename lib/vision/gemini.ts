@@ -33,15 +33,14 @@ import type {
  * La cadena de modelos, del preferido al último recurso.
  *
  * No es una lista de repuestos teóricos: medido contra la API el 25/08/2026,
- * `gemini-3.7-flash` contestaba 503 por saturación, y la capa gratuita corta a
- * las **20 peticiones por día y por modelo** (`quotaId
- * GenerateRequestsPerDayPerProjectPerModel-FreeTier`). Con un solo modelo, un
- * día normal de registro se queda sin cuota a media tarde.
+ * `gemini-3.7-flash` contestaba 503 por saturación. Esa es la razón de ser de
+ * la cadena — un modelo caído no debería dejarte sin registrar el almuerzo.
  *
- * Como el tope es por modelo, bajar al siguiente cuando uno se agota mantiene
- * la app andando. El efecto de costado es que la capa gratuita rinde varias
- * veces más; el motivo por el que existe es que un 503 no debería dejarte sin
- * poder registrar el almuerzo.
+ * La capa gratuita además corta a las **20 peticiones por día y por modelo**
+ * (`quotaId GenerateRequestsPerDayPerProjectPerModel-FreeTier`). Para un uso
+ * normal eso alcanza de sobra: unas 4 comidas por día a uno o dos turnos cada
+ * una son 4 a 10 peticiones. El tope se toca en un día raro —muchos turnos por
+ * comida, o reintentos— y ahí la cadena da aire, porque la cuota es por modelo.
  *
  * El orden **no** es de más nuevo a más viejo: sale de medir los dos primeros
  * contra las mismas 9 comidas de la bitácora (`npm run eval -- --texto`).

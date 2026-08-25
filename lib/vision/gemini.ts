@@ -29,7 +29,43 @@ import type {
  *    comparables.
  */
 
-const MODELO_POR_DEFECTO = "gemini-2.5-flash";
+/**
+ * La cadena de modelos, del preferido al último recurso.
+ *
+ * No es una lista de repuestos teóricos: medido contra la API el 25/08/2026,
+ * `gemini-3.7-flash` contestaba 503 por saturación, y la capa gratuita corta a
+ * las **20 peticiones por día y por modelo** (`quotaId
+ * GenerateRequestsPerDayPerProjectPerModel-FreeTier`). Con un solo modelo, un
+ * día normal de registro se queda sin cuota a media tarde.
+ *
+ * Como el tope es por modelo, bajar al siguiente cuando uno se agota mantiene
+ * la app andando. El efecto de costado es que la capa gratuita rinde varias
+ * veces más; el motivo por el que existe es que un 503 no debería dejarte sin
+ * poder registrar el almuerzo.
+ *
+ * Están ordenados de más nuevo a más viejo. `FITFOOD_MODELO` pisa la cadena
+ * entera con uno solo, que es lo que hace falta para medir un modelo aislado.
+ */
+const CADENA = [
+  "gemini-3.6-flash",
+  "gemini-3.5-flash",
+  "gemini-3-flash-preview",
+  "gemini-2.5-flash",
+] as const;
+
+/** Errores que justifican probar el modelo siguiente. */
+function vaAlSiguiente(err: unknown): boolean {
+  const codigo = (err as { status?: number })?.status;
+  const mensaje = err instanceof Error ? err.message : String(err);
+  // 429: se acabó la cuota del día. 503/500: el modelo está saturado.
+  return (
+    codigo === 429 ||
+    codigo === 503 ||
+    codigo === 500 ||
+    /\b(429|503|500)\b/.test(mensaje) ||
+    /RESOURCE_EXHAUSTED|UNAVAILABLE|overloaded|high demand/i.test(mensaje)
+  );
+}
 
 let cliente: GoogleGenAI | null = null;
 
@@ -45,15 +81,48 @@ function obtenerCliente(): GoogleGenAI {
   return cliente;
 }
 
+/** Los modelos a probar, en orden. */
+export function cadenaDeModelos(
+  env: Record<string, string | undefined> = process.env,
+): string[] {
+  const fijado = env.FITFOOD_MODELO?.trim();
+  if (fijado) return fijado.split(",").map((m) => m.trim()).filter(Boolean);
+  return [...CADENA];
+}
+
 function modeloActivo(): string {
-  return process.env.FITFOOD_MODELO?.trim() || MODELO_POR_DEFECTO;
+  return cadenaDeModelos()[0];
 }
 
 async function estimar(
   peticion: PeticionEstimacion,
 ): Promise<ResultadoEstimacion> {
+  const modelos = cadenaDeModelos();
+  let ultimoError: unknown;
+
+  for (const modelo of modelos) {
+    try {
+      return await estimarCon(modelo, peticion);
+    } catch (err) {
+      if (!vaAlSiguiente(err)) throw err;
+      ultimoError = err;
+    }
+  }
+
+  throw new Error(
+    `Ningún modelo de Gemini pudo responder (probé ${modelos.length}: ` +
+      `${modelos.join(", ")}). La capa gratuita corta a las 20 peticiones ` +
+      `por día y por modelo, así que puede que se haya agotado la del día. ` +
+      `El registro manual sigue funcionando.\n` +
+      `Último error: ${ultimoError instanceof Error ? ultimoError.message.slice(0, 200) : ultimoError}`,
+  );
+}
+
+async function estimarCon(
+  modelo: string,
+  peticion: PeticionEstimacion,
+): Promise<ResultadoEstimacion> {
   const ai = obtenerCliente();
-  const modelo = modeloActivo();
   const arranque = Date.now();
 
   // El hilo previo. La foto solo va en el turno en que se mandó: reenviarla en

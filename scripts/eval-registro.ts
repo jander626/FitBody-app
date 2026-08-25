@@ -150,7 +150,7 @@ async function main() {
     `\nSe van a medir ${aMedir.length} comidas en modo ${usarFotos ? "foto" : "texto"}.\n` +
       (proveedor ? `Proveedor: ${proveedor.nombre} · ${proveedor.modelo}\n` : "") +
       (gratis
-        ? `Costo: $0 — capa gratuita. Ojo con el tope de peticiones por minuto.\n`
+        ? `Costo: $0 — capa gratuita, que corta a las 20 peticiones por día y por modelo.\n`
         : `Costo aproximado: $${costoAprox.toFixed(2)} USD.\n`),
   );
 
@@ -185,6 +185,9 @@ async function main() {
   const latencias: number[] = [];
   let costoReal = 0;
   let fallos = 0;
+  /** Cuántas comidas contestó cada modelo: con cadena de respaldo cambia. */
+  const porModelo = new Map<string, number>();
+  let fallosSeguidos = 0;
 
   for (const [i, comida] of aMedir.entries()) {
     const nombres = comida.items.map((it) => it.alimento).join(", ");
@@ -218,6 +221,8 @@ async function main() {
 
       costoReal += resultado.costoUsd;
       latencias.push(resultado.latenciaMs);
+      porModelo.set(resultado.modelo, (porModelo.get(resultado.modelo) ?? 0) + 1);
+      fallosSeguidos = 0;
 
       const { items } = normalizarEstimacion(resultado.respuesta.items, tabla);
 
@@ -245,7 +250,19 @@ async function main() {
       );
     } catch (err) {
       fallos++;
+      fallosSeguidos++;
       console.log(`falló: ${(err as Error).message.slice(0, 80)}`);
+
+      // Cuando se agota la cuota del día, las que siguen van a fallar todas.
+      // Seguir intentando no mide nada y llena la pantalla de ruido.
+      if (fallosSeguidos >= 3) {
+        console.log(
+          `\n✗ Tres fallos seguidos: se corta acá.\n` +
+            `  Van ${erroresKcal.length} comidas medidas de ${aMedir.length}.\n` +
+            `  Si es la cuota diaria de la capa gratuita, se repone mañana.\n`,
+        );
+        break;
+      }
     }
   }
 
@@ -258,7 +275,13 @@ async function main() {
   console.log(`
 ────────────────────────────────────────────
   RESULTADO — modo ${usarFotos ? "foto" : "texto"}, ${erroresKcal.length} comidas
-  ${proveedor?.nombre ?? "—"} · ${proveedor?.modelo ?? "—"}
+  ${proveedor?.nombre ?? "—"} · ${
+    porModelo.size === 0
+      ? (proveedor?.modelo ?? "—")
+      : // Quién contestó de verdad. Con cadena de respaldo puede ser más de
+        // uno, y en ese caso el número es de la mezcla, no de un modelo.
+        [...porModelo.entries()].map(([m, n]) => `${m} (${n})`).join(" + ")
+  }${porModelo.size > 1 ? "\n  ⚠ Contestó más de un modelo: el resultado es de la mezcla." : ""}
 
   Alimentos identificados
     estricto (mismo nombre)   ${pct(aciertosEstrictos, itemsEsperados)}  (${aciertosEstrictos}/${itemsEsperados})

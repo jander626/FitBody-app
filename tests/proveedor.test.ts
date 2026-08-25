@@ -10,6 +10,7 @@ import { z } from "zod";
 import { aJsonSchema } from "@/lib/vision/esquema-json";
 import { RespuestaSchema } from "@/lib/vision/esquema";
 import { elegirProveedor } from "@/lib/vision/proveedor";
+import { cadenaDeModelos } from "@/lib/vision/gemini";
 import { costoUsd, esGratis, PRECIOS_POR_PROVEEDOR } from "@/lib/guardrails/costos";
 
 describe("traducir el esquema para Gemini", () => {
@@ -85,6 +86,37 @@ describe("elegir proveedor", () => {
     expect(() => elegirProveedor({ FITFOOD_PROVEEDOR: "openai" })).toThrow(
       /no existe/,
     );
+  });
+});
+
+describe("cadena de modelos de Gemini", () => {
+  it("por omisión hay más de uno", () => {
+    // Con uno solo, la capa gratuita corta a las 20 peticiones del día y la
+    // app se queda muda a media tarde.
+    expect(cadenaDeModelos({}).length).toBeGreaterThan(1);
+  });
+
+  it("no repite modelos: cada uno tiene que aportar su propia cuota", () => {
+    const cadena = cadenaDeModelos({});
+    expect(new Set(cadena).size).toBe(cadena.length);
+  });
+
+  it("FITFOOD_MODELO fija uno solo, que es lo que hace falta para medir", () => {
+    expect(cadenaDeModelos({ FITFOOD_MODELO: "gemini-2.5-flash" })).toEqual([
+      "gemini-2.5-flash",
+    ]);
+  });
+
+  it("acepta una lista separada por comas", () => {
+    expect(cadenaDeModelos({ FITFOOD_MODELO: "uno, dos ,tres" })).toEqual([
+      "uno",
+      "dos",
+      "tres",
+    ]);
+  });
+
+  it("una variable vacía no deja la cadena sin modelos", () => {
+    expect(cadenaDeModelos({ FITFOOD_MODELO: "  " }).length).toBeGreaterThan(1);
   });
 });
 

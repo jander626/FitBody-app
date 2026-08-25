@@ -4,6 +4,7 @@
  * Separar la vista de la carga permite renderizarla con datos de ejemplo
  * (scripts/muestras.ts) y revisarla sin una sesión real.
  */
+import Link from "next/link";
 import { Aviso, Dato, Encabezado, Tarjeta, TituloSeccion } from "@/components/ui";
 import type { EstadoPerfil } from "@/lib/datos/perfil";
 import { cerrarSesion } from "../acciones";
@@ -107,6 +108,23 @@ export function VistaPerfil({
               objetivo={objetivo}
               pesoActualKg={pesoActualKg}
             />
+          </Tarjeta>
+        </div>
+
+        <div>
+          <TituloSeccion>Reloj</TituloSeccion>
+          <Tarjeta>
+            <p className="text-sm text-ink-2">
+              Importá los informes de Garmin Connect y el gasto de cada día
+              pasa a ser el que midió el reloj, en vez del que calcula la
+              fórmula con tu peso y tu edad.
+            </p>
+            <Link
+              href="/garmin"
+              className="mt-3 block rounded-xl border border-hairline px-4 py-3 text-center text-base font-medium text-ink"
+            >
+              Importar datos de Garmin
+            </Link>
           </Tarjeta>
         </div>
 

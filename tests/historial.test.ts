@@ -100,6 +100,58 @@ describe("resumen de días", () => {
   });
 });
 
+describe("gasto medido por el reloj", () => {
+  const dias: DiaHistorial[] = [
+    { fecha: "2026-08-15", kcal: 2100, proteinaG: 160, carbsG: 150, grasaG: 80, comidas: 4 },
+    { fecha: "2026-08-16", kcal: 2100, proteinaG: 160, carbsG: 150, grasaG: 80, comidas: 4 },
+  ];
+  // El 15 caminó 16.000 pasos; el 16 se quedó en casa.
+  const medido = new Map([["2026-08-15", 2983]]);
+
+  it("usa el gasto del día cuando lo hay", () => {
+    const r = resumir(dias, { kcal: OBJETIVO, proteinaG: 160 }, GASTO, medido);
+    expect(r[0].deficit).toBe(883); // 2983 − 2100
+    expect(r[0].gastoKcal).toBe(2983);
+    expect(r[0].gastoMedido).toBe(true);
+  });
+
+  it("cae en la fórmula el día que no se midió", () => {
+    const r = resumir(dias, { kcal: OBJETIVO, proteinaG: 160 }, GASTO, medido);
+    expect(r[1].deficit).toBe(350); // 2450 − 2100
+    expect(r[1].gastoMedido).toBe(false);
+  });
+
+  it("el mismo consumo puede cambiar de estado según el gasto real", () => {
+    // 2.500 kcal es "sin déficit" contra el gasto estimado de 2.450, pero un
+    // día de 16.000 pasos sí deja déficit. Es justo la corrección que aporta
+    // el reloj, y por eso vale la pena importarlo.
+    const uno = [{ ...dias[0], kcal: 2500 }];
+    expect(resumir(uno, { kcal: OBJETIVO, proteinaG: 160 }, GASTO)[0].estado).toBe(
+      "sin_deficit",
+    );
+    expect(
+      resumir(uno, { kcal: OBJETIVO, proteinaG: 160 }, GASTO, medido)[0].estado,
+    ).toBe("deficit");
+  });
+
+  it("sin mapa de medidos se comporta como antes", () => {
+    const r = resumir(dias, { kcal: OBJETIVO, proteinaG: 160 }, GASTO);
+    expect(r.every((d) => d.gastoKcal === GASTO)).toBe(true);
+    expect(r.some((d) => d.gastoMedido)).toBe(false);
+  });
+
+  it("una fecha medida que no está en el diario no agrega días", () => {
+    const r = resumir(
+      dias,
+      { kcal: OBJETIVO, proteinaG: 160 },
+      GASTO,
+      new Map([["2026-01-01", 3000]]),
+    );
+    expect(r.length).toBe(2);
+    expect(r.every((d) => !d.gastoMedido)).toBe(true);
+  });
+});
+
 describe("promedios", () => {
   it("promedia y cuenta los días en objetivo", () => {
     const dias = resumir(

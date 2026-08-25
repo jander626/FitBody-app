@@ -12,6 +12,65 @@ export type Json =
 export interface Database {
   public: {
     Tables: {
+      daily_metrics: {
+        Row: {
+          user_id: string;
+          fecha: string;
+          pasos: number | null;
+          pasos_objetivo: number | null;
+          sueno_horas: number | null;
+          sueno_calidad: string | null;
+          sueno_puntuacion: number | null;
+          fc_reposo: number | null;
+          body_battery: number | null;
+          kcal_activas: number | null;
+          kcal_totales: number | null;
+          fuente: string;
+          creado_en: string;
+          actualizado_en: string;
+        };
+        Insert: {
+          user_id: string;
+          fecha: string;
+          pasos?: number | null;
+          pasos_objetivo?: number | null;
+          sueno_horas?: number | null;
+          sueno_calidad?: string | null;
+          sueno_puntuacion?: number | null;
+          fc_reposo?: number | null;
+          body_battery?: number | null;
+          kcal_activas?: number | null;
+          kcal_totales?: number | null;
+          fuente?: string;
+          creado_en?: string;
+          actualizado_en?: string;
+        };
+        Update: {
+          user_id?: string;
+          fecha?: string;
+          pasos?: number | null;
+          pasos_objetivo?: number | null;
+          sueno_horas?: number | null;
+          sueno_calidad?: string | null;
+          sueno_puntuacion?: number | null;
+          fc_reposo?: number | null;
+          body_battery?: number | null;
+          kcal_activas?: number | null;
+          kcal_totales?: number | null;
+          fuente?: string;
+          creado_en?: string;
+          actualizado_en?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "daily_metrics_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       foods: {
         Row: {
           id: string;

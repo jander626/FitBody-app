@@ -31,6 +31,16 @@ export interface ResumenDia extends DiaHistorial {
   pctProteina: number;
   /** Déficit real de ese día: gasto − consumido. Negativo si se pasó. */
   deficit: number;
+  /** El gasto con el que se calculó el déficit de este día. */
+  gastoKcal: number;
+  /**
+   * Si ese gasto lo midió el reloj o salió de la fórmula.
+   *
+   * Importa distinguirlo: el estimado es el mismo número todos los días y no
+   * sabe si caminaste 4.000 pasos o 16.000. Un déficit calculado contra un
+   * gasto inventado se parece a un dato y no lo es.
+   */
+  gastoMedido: boolean;
 }
 
 /** Un 5 % de margen: pasarse por 40 kcal no cambia el día. */
@@ -46,20 +56,31 @@ export function clasificarDia(
   return "sin_deficit";
 }
 
+/**
+ * @param gastoKcal    El estimado por fórmula, para los días sin medición.
+ * @param gastoMedido  Gasto real del reloj por fecha, cuando se importó.
+ */
 export function resumir(
   dias: DiaHistorial[],
   objetivo: { kcal: number; proteinaG: number },
   gastoKcal: number,
+  gastoMedido?: ReadonlyMap<string, number>,
 ): ResumenDia[] {
-  return dias.map((d) => ({
-    ...d,
-    estado: clasificarDia(d.kcal, objetivo.kcal, gastoKcal),
-    pctProteina:
-      objetivo.proteinaG > 0
-        ? Math.round((d.proteinaG / objetivo.proteinaG) * 100)
-        : 0,
-    deficit: Math.round(gastoKcal - d.kcal),
-  }));
+  return dias.map((d) => {
+    const medido = gastoMedido?.get(d.fecha);
+    const gasto = medido ?? gastoKcal;
+    return {
+      ...d,
+      estado: clasificarDia(d.kcal, objetivo.kcal, gasto),
+      pctProteina:
+        objetivo.proteinaG > 0
+          ? Math.round((d.proteinaG / objetivo.proteinaG) * 100)
+          : 0,
+      deficit: Math.round(gasto - d.kcal),
+      gastoKcal: gasto,
+      gastoMedido: medido !== undefined,
+    };
+  });
 }
 
 /** Promedios del periodo. Null cuando no hay días con registro. */

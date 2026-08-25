@@ -17,7 +17,7 @@ export function VistaHistorial({
   historial: Historial;
   hoy: string;
 }) {
-  const { dias, objetivo, gastoKcal, promedio } = historial;
+  const { dias, objetivo, gastoKcal, diasMedidos, promedio } = historial;
 
   if (dias.length === 0) {
     return (
@@ -81,6 +81,21 @@ export function VistaHistorial({
                   {((promedio.deficit * 7) / 7700).toFixed(2)} kg por semana.
                 </p>
               )}
+              <p className="mt-1 text-xs text-muted">
+                {diasMedidos === 0 ? (
+                  <>
+                    El gasto sale de la fórmula, igual para todos los días.{" "}
+                    <Link href="/garmin" className="underline underline-offset-4">
+                      Importá tus datos de Garmin
+                    </Link>{" "}
+                    y pasa a ser el que midió el reloj.
+                  </>
+                ) : diasMedidos === dias.length ? (
+                  "El gasto de todos los días lo midió el reloj."
+                ) : (
+                  `${diasMedidos} de ${dias.length} días usan el gasto medido por el reloj; el resto, la fórmula.`
+                )}
+              </p>
             </Tarjeta>
           </div>
         )}

@@ -45,6 +45,12 @@ insert into public.weight_logs (user_id, fecha, peso_kg) values
   ('11111111-1111-1111-1111-111111111111', '2026-08-23', 78.9),
   ('22222222-2222-2222-2222-222222222222', '2026-08-23', 91.4);
 
+-- Métricas del reloj: sueño, pasos y frecuencia cardiaca son datos de salud,
+-- así que el aislamiento acá importa tanto como en el peso.
+insert into public.daily_metrics (user_id, fecha, pasos, fc_reposo, kcal_totales) values
+  ('11111111-1111-1111-1111-111111111111', '2026-08-23', 9461, 52, 2450),
+  ('22222222-2222-2222-2222-222222222222', '2026-08-23', 3120, 71, 2980);
+
 
 -- ------------------------------------------------------------ como Ana ---
 
@@ -65,6 +71,12 @@ begin
   -- El alimento semilla lo ve todo el mundo.
   select count(*) into n from public.foods where publico;
   assert n = 1, format('Ana deberia ver 1 alimento publico, ve %s', n);
+
+  select count(*) into n from public.daily_metrics;
+  assert n = 1, format('Ana deberia ver 1 dia de metricas, ve %s', n);
+
+  select pasos into n from public.daily_metrics;
+  assert n = 9461, format('Ana ve los pasos de otro: %s', n);
 end;
 $$;
 
@@ -141,6 +153,9 @@ begin
 
   select count(*) into n from public.meal_logs;
   assert n = 0, format('Sin sesion no se deberia ver ninguna comida, se ven %s', n);
+
+  select count(*) into n from public.daily_metrics;
+  assert n = 0, format('Sin sesion no se deberian ver metricas, se ven %s', n);
 end;
 $$;
 

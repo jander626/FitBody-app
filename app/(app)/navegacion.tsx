@@ -12,6 +12,7 @@ import { usePathname } from "next/navigation";
  */
 const DESTINOS = [
   { href: "/hoy", etiqueta: "Hoy", icono: AnilloIcono },
+  { href: "/historial", etiqueta: "Historial", icono: CalendarioIcono },
   { href: "/registrar", etiqueta: "Registrar", icono: MasIcono, principal: true },
   { href: "/peso", etiqueta: "Peso", icono: CurvaIcono },
   { href: "/perfil", etiqueta: "Perfil", icono: PersonaIcono },
@@ -84,6 +85,21 @@ function MasIcono() {
         stroke="currentColor"
         strokeWidth="2.5"
         strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function CalendarioIcono() {
+  return (
+    <svg viewBox="0 0 24 24" className="size-5" fill="none" aria-hidden="true">
+      <rect
+        x="3.5" y="5" width="17" height="15" rx="2.5"
+        stroke="currentColor" strokeWidth="2"
+      />
+      <path
+        d="M3.5 9.5h17M8 3.5v3M16 3.5v3"
+        stroke="currentColor" strokeWidth="2" strokeLinecap="round"
       />
     </svg>
   );

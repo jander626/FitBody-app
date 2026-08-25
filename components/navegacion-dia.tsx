@@ -1,13 +1,14 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 /**
  * Moverse entre días del diario.
  *
  * En el celular escribir una fecha en la URL no es una opción, así que hacen
- * falta las flechas. La fecha además abre el selector nativo del sistema, que
- * es lo que la gente ya sabe usar y no hay que reinventar.
+ * falta las flechas. La fecha lleva al historial, donde el calendario muestra
+ * de un vistazo qué días tienen registro y cómo salió cada uno.
  *
  * No se puede ir más allá de hoy: un día futuro siempre estaría vacío y el
  * botón muerto confunde menos que una pantalla en blanco sin explicación.
@@ -55,20 +56,13 @@ export function NavegacionDia({
         <Flecha direccion="izquierda" />
       </button>
 
-      <label className="relative flex-1 text-center">
-        <span className="text-sm text-muted">
-          {esHoy ? "Hoy" : enPalabras(fecha)}
-        </span>
-        {/* El input cubre la etiqueta: al tocarla se abre el selector nativo. */}
-        <input
-          type="date"
-          value={fecha}
-          max={hoy}
-          onChange={(e) => e.target.value && irA(e.target.value)}
-          aria-label="Elegir día"
-          className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-        />
-      </label>
+      <Link
+        href="/historial"
+        aria-label="Ver el historial y elegir otro día"
+        className="flex-1 py-1 text-center text-sm text-muted underline-offset-4 hover:underline"
+      >
+        {esHoy ? "Hoy" : enPalabras(fecha)}
+      </Link>
 
       <button
         type="button"

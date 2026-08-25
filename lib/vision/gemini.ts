@@ -43,12 +43,27 @@ import type {
  * veces más; el motivo por el que existe es que un 503 no debería dejarte sin
  * poder registrar el almuerzo.
  *
- * Están ordenados de más nuevo a más viejo. `FITFOOD_MODELO` pisa la cadena
- * entera con uno solo, que es lo que hace falta para medir un modelo aislado.
+ * El orden **no** es de más nuevo a más viejo: sale de medir los dos primeros
+ * contra las mismas 9 comidas de la bitácora (`npm run eval -- --texto`).
+ *
+ *                        error kcal   bajo 20 %   latencia
+ *   gemini-3.5-flash        18 %        5 de 9      7.6 s
+ *   gemini-3.6-flash        15 %        7 de 9       21 s
+ *
+ * Va primero el rápido. Con nueve comidas, tres puntos de error mediano no
+ * distinguen a un modelo del otro —la muestra es demasiado chica—, pero
+ * catorce segundos de diferencia son ciertos y se sienten en cada registro.
+ * Además la tarjeta se confirma a mano: un error de estimación se corrige de
+ * un toque, y la espera no.
+ *
+ * Si algún día se mide con más comidas y 3.6 sigue arriba, se invierte acá o
+ * con FITFOOD_MODELO, que además pisa la cadena entera con un solo modelo —
+ * que es lo que hace falta para medir uno aislado sin que el respaldo
+ * ensucie la medición.
  */
 const CADENA = [
-  "gemini-3.6-flash",
   "gemini-3.5-flash",
+  "gemini-3.6-flash",
   "gemini-3-flash-preview",
   "gemini-2.5-flash",
 ] as const;

@@ -1,5 +1,5 @@
 /**
- * El único endpoint que habla con Claude.
+ * El único endpoint que habla con un modelo.
  *
  * Orden deliberado: primero los límites contra Postgres, después la llamada.
  * Si un límite rechaza, la API no se toca — que es el punto de tenerlos.
@@ -9,7 +9,6 @@ import { z } from "zod";
 import { listarAlimentos } from "@/lib/datos/alimentos";
 import { fechaDeHoy, obtenerDia } from "@/lib/datos/diario";
 import { verificarAntesDeLlamar } from "@/lib/guardrails/verificar";
-import { MODELO } from "@/lib/guardrails/costos";
 import { LIMITES } from "@/lib/guardrails/limites";
 import { clienteServidor } from "@/lib/supabase/cliente-servidor";
 import { estimar, type TurnoPrevio } from "@/lib/vision/cliente";
@@ -153,7 +152,9 @@ export async function POST(request: NextRequest) {
     tokens_cache_read: resultado.tokensCacheRead,
     tokens_out: resultado.tokensOut,
     costo_usd: resultado.costoUsd,
-    modelo: MODELO,
+    // El modelo que contestó de verdad, no el configurado: si se cambia de
+    // proveedor, el histórico tiene que seguir diciendo quién estimó qué.
+    modelo: resultado.modelo,
   });
 
   await supabase

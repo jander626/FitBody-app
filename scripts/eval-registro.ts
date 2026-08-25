@@ -12,8 +12,14 @@
  * Usa el mismo `estimar()` y la misma normalización que la app en producción:
  * medir una copia parecida no mediría nada.
  *
- * Requiere ANTHROPIC_API_KEY. Es la única parte del proyecto que gasta dinero,
- * así que primero estima el costo y pide confirmación.
+ * Corre contra el proveedor configurado, así que sirve para **comparar** dos
+ * modelos con la misma vara:
+ *
+ *   FITFOOD_PROVEEDOR=gemini    npm run eval -- --texto
+ *   FITFOOD_PROVEEDOR=anthropic npm run eval -- --texto
+ *
+ * Requiere la clave del proveedor elegido. Puede gastar dinero, así que
+ * primero estima el costo y pide confirmación.
  */
 import { createInterface } from "node:readline/promises";
 import { readFile, readdir } from "node:fs/promises";
@@ -22,7 +28,9 @@ import path from "node:path";
 import { config as cargarEnv } from "dotenv";
 import type { Alimento } from "@/lib/alimentos";
 import { encontrar, mediana } from "@/lib/evaluacion";
-import { estimar } from "@/lib/vision/cliente";
+import { estimar, proveedorActivo } from "@/lib/vision/cliente";
+import type { Proveedor } from "@/lib/vision/proveedor";
+import { esGratis } from "@/lib/guardrails/costos";
 import { normalizarEstimacion } from "@/lib/vision/normalizar";
 import { slugificar } from "@/lib/importacion/mapeo";
 
@@ -113,12 +121,14 @@ function pct(n: number, total: number): string {
 // ------------------------------------------------------------------ main ---
 
 async function main() {
-  if (!dry && !process.env.ANTHROPIC_API_KEY) {
-    console.error(
-      "✗ Falta ANTHROPIC_API_KEY. Es la única parte del proyecto que llama a\n" +
-        "  la API de verdad, así que sin clave no hay nada que medir.",
-    );
-    process.exit(1);
+  let proveedor: Proveedor | null = null;
+  if (!dry) {
+    try {
+      proveedor = proveedorActivo();
+    } catch (err) {
+      console.error(`✗ ${(err as Error).message}`);
+      process.exit(1);
+    }
   }
 
   const [etiquetas, tabla] = await Promise.all([leerEtiquetas(), leerTabla()]);
@@ -130,10 +140,18 @@ async function main() {
   }
 
   // Una estimación gruesa, para que nadie arranque sin saber qué va a gastar.
-  const costoAprox = aMedir.length * (usarFotos ? 0.035 : 0.02);
+  const gratis = proveedor ? esGratis(proveedor.nombre) : false;
+  const porComida = usarFotos ? 0.035 : 0.02;
+  // Gemini Flash cuesta cerca de un orden de magnitud menos que Opus.
+  const factor = proveedor?.nombre === "gemini" ? 0.06 : 1;
+  const costoAprox = aMedir.length * porComida * factor;
+
   console.log(
     `\nSe van a medir ${aMedir.length} comidas en modo ${usarFotos ? "foto" : "texto"}.\n` +
-      `Costo aproximado: $${costoAprox.toFixed(2)} USD.\n`,
+      (proveedor ? `Proveedor: ${proveedor.nombre} · ${proveedor.modelo}\n` : "") +
+      (gratis
+        ? `Costo: $0 — capa gratuita. Ojo con el tope de peticiones por minuto.\n`
+        : `Costo aproximado: $${costoAprox.toFixed(2)} USD.\n`),
   );
 
   if (dry) {
@@ -240,6 +258,7 @@ async function main() {
   console.log(`
 ────────────────────────────────────────────
   RESULTADO — modo ${usarFotos ? "foto" : "texto"}, ${erroresKcal.length} comidas
+  ${proveedor?.nombre ?? "—"} · ${proveedor?.modelo ?? "—"}
 
   Alimentos identificados
     estricto (mismo nombre)   ${pct(aciertosEstrictos, itemsEsperados)}  (${aciertosEstrictos}/${itemsEsperados})

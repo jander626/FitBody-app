@@ -89,11 +89,99 @@ body {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
+/* ------------------------------------------------------------ pulsación ---
+
+   El body apaga el resaltado que pone el sistema al tocar
+   (-webkit-tap-highlight-color: transparent). Eso está bien solo si se pone
+   algo en su lugar, y no se había puesto nada: cada toque quedaba mudo, sin
+   ninguna señal de que el dedo había hecho contacto. En un teléfono eso se
+   siente como que la app se colgó, y lleva a tocar dos veces.
+
+   La respuesta va acá y no en cada componente porque tiene que ser igual en
+   todos: una app donde unos botones responden y otros no se siente peor que
+   una donde ninguno responde.
+
+   Encoger un poco es la señal más legible en una pantalla táctil: el dedo
+   tapa el elemento, así que un cambio de color se ve menos que un cambio de
+   tamaño en el borde. Va acompañado de un oscurecido leve para los casos en
+   que el dedo tape justo los bordes.
+
+   La entrada es más rápida que la salida a propósito: la pulsación tiene que
+   sentirse instantánea, y el regreso puede ser suave. */
+
+button,
+a,
+label[for],
+summary,
+[role="button"] {
+  transition:
+    transform 140ms cubic-bezier(0.2, 0, 0, 1),
+    filter 140ms ease,
+    background-color 140ms ease,
+    border-color 140ms ease;
+}
+
+button:active,
+a:active,
+label[for]:active,
+summary:active,
+[role="button"]:active {
+  transform: scale(0.97);
+  filter: brightness(0.93);
+  transition-duration: 60ms;
+}
+
+/* Un control apagado no debe fingir que responde. */
+button:disabled:active,
+[aria-disabled="true"]:active {
+  transform: none;
+  filter: none;
+}
+
+/* Sin puntero no hay hover: en el celular, un :hover se queda pegado después
+   de tocar, y el elemento parece seleccionado cuando ya no lo está. */
+@media (hover: hover) and (pointer: fine) {
+  button:hover:not(:disabled),
+  a:hover,
+  label[for]:hover {
+    filter: brightness(0.96);
+  }
+
+  /* Después del bloque de hover a propósito: con la misma especificidad gana
+     la última regla, y con el orden invertido una pulsación con el puntero
+     encima mostraba el brillo del hover en vez del de la pulsación. */
+  button:active:not(:disabled),
+  a:active,
+  label[for]:active,
+  summary:active,
+  [role="button"]:active {
+    filter: brightness(0.93);
+  }
+}
+
+/* El anillo de foco solo para teclado: en táctil sobra y ensucia. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
+  }
+
+  /* Quien pide menos movimiento igual necesita saber que tocó algo: se cambia
+     el brillo, que no es movimiento, en vez de quitar la respuesta entera. */
+  button:active,
+  a:active,
+  label[for]:active,
+  summary:active,
+  [role="button"]:active {
+    transform: none;
+    filter: brightness(0.88);
   }
 }

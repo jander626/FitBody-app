@@ -6,6 +6,7 @@
  */
 import Link from "next/link";
 import { Aviso, Dato, Encabezado, Tarjeta, TituloSeccion } from "@/components/ui";
+import { SelectorTema } from "@/components/selector-tema";
 import type { EstadoPerfil } from "@/lib/datos/perfil";
 import { cerrarSesion } from "../acciones";
 import { FormularioPerfil } from "./formulario";
@@ -108,6 +109,13 @@ export function VistaPerfil({
               objetivo={objetivo}
               pesoActualKg={pesoActualKg}
             />
+          </Tarjeta>
+        </div>
+
+        <div>
+          <TituloSeccion>Apariencia</TituloSeccion>
+          <Tarjeta>
+            <SelectorTema />
           </Tarjeta>
         </div>
 

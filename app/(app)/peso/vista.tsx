@@ -72,7 +72,7 @@ export function VistaPeso({
             <button
               type="submit"
               disabled={guardando}
-              className="mt-3 w-full rounded-xl bg-accent px-4 py-3 text-base font-medium text-white disabled:opacity-50"
+              className="mt-3 w-full rounded-xl bg-accent px-4 py-3 text-base font-medium text-sobre-accent disabled:opacity-50"
             >
               {guardando
                 ? "Guardando…"
@@ -157,7 +157,7 @@ function TarjetaAjuste({
                 setResultado(await aceptarAjuste(ajuste.kcalPropuesto)),
               )
             }
-            className="mt-3 w-full rounded-xl bg-accent px-4 py-3 text-base font-medium text-white disabled:opacity-50"
+            className="mt-3 w-full rounded-xl bg-accent px-4 py-3 text-base font-medium text-sobre-accent disabled:opacity-50"
           >
             {aplicando ? "Aplicando…" : "Aceptar el ajuste"}
           </button>

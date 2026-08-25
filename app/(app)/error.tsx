@@ -46,7 +46,7 @@ export default function ErrorApp({
         <button
           type="button"
           onClick={reset}
-          className="flex-1 rounded-xl bg-accent px-4 py-3 text-base font-medium text-white"
+          className="flex-1 rounded-xl bg-accent px-4 py-3 text-base font-medium text-sobre-accent"
         >
           Reintentar
         </button>

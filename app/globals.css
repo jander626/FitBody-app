@@ -1,45 +1,95 @@
 @import "tailwindcss";
 
-/* Paleta heredada del dashboard de fitfood, para que la app se sienta
-   continuación de la bitácora y no una herramienta distinta. */
+/* Paleta Tinta.
+ *
+ * No hay acento de color: los botones son tinta sobre papel, y el color queda
+ * reservado para lo único donde significa algo — bien, aviso, mal. Cuando algo
+ * se pone verde o rojo en esta app, es porque quiere decir algo.
+ *
+ * La paleta anterior tenía el acento ocre pegado al ámbar de los avisos (ΔE
+ * 3.5 en oscuro, contra un piso de 15) y el texto de acento en 3.4:1, bajo el
+ * 4.5:1 que pide la norma. Sin acento cromático, lo primero desaparece por
+ * construcción y lo segundo sube a 16.8:1.
+ *
+ * Los grises no son neutros puros: llevan una pizca de calidez, para que el
+ * papel no se sienta clínico.
+ */
 :root {
-  --ground: #f6f5f2;
+  --ground: #f5f5f3;
   --surface: #ffffff;
-  --ink: #16181a;
-  --ink-2: #4a4842;
-  --muted: #6b6862;
-  --hairline: #e3e0d9;
-  --hairline-soft: #efede7;
-  --accent: #c77a1e;
-  --accent-soft: rgba(199, 122, 30, 0.13);
+  --ink: #1c1d21;
+  --ink-2: #4a4c52;
+  --muted: #71747a;
+  --hairline: #e0e0dd;
+  --hairline-soft: #ededea;
+  --accent: #1c1d21;
+  --accent-soft: rgba(28, 29, 33, 0.07);
+  /* El texto sobre el acento. Antes era blanco fijo; ahora depende del tema,
+     porque en oscuro el acento es claro y el texto encima tiene que ser
+     oscuro. */
+  --sobre-accent: #ffffff;
   --good: #1b7f4b;
   --good-bg: rgba(27, 127, 75, 0.12);
-  --warn: #96601a;
-  --warn-bg: rgba(150, 96, 26, 0.12);
+  --warn: #a35a0d;
+  --warn-bg: rgba(163, 90, 13, 0.12);
   --bad: #c2321b;
   --bad-bg: rgba(194, 50, 27, 0.12);
-  --shadow: 0 1px 2px rgba(20, 18, 12, 0.05), 0 6px 18px rgba(20, 18, 12, 0.05);
+  --shadow: 0 1px 2px rgba(20, 20, 18, 0.05), 0 6px 18px rgba(20, 20, 18, 0.05);
 }
 
+/*
+ * El tema tiene TRES estados, no dos: claro, oscuro, y "el que diga el
+ * teléfono". El tercero es el que trae la app puesta, y es el único donde no
+ * hay ningún atributo en el html.
+ *
+ * De ahí la forma de estas reglas:
+ *  - `:root` a secas es el tema claro y el punto de partida.
+ *  - El media query se guarda con `:not([data-theme="light"])` para que elegir
+ *    claro a mano le gane a un sistema en oscuro.
+ *  - `[data-theme="dark"]` va aparte para que elegir oscuro a mano le gane a
+ *    un sistema en claro.
+ * Sin las tres, una de las seis combinaciones queda mal.
+ */
 @media (prefers-color-scheme: dark) {
-  :root {
-    --ground: #14161a;
-    --surface: #1b1e23;
-    --ink: #e7e5e0;
-    --ink-2: #b6b2a9;
-    --muted: #8d8a82;
-    --hairline: #2a2e34;
-    --hairline-soft: #23272c;
-    --accent: #c4831f;
-    --accent-soft: rgba(196, 131, 31, 0.2);
-    --good: #2e9c63;
-    --good-bg: rgba(46, 156, 99, 0.16);
-    --warn: #c0913f;
-    --warn-bg: rgba(192, 145, 63, 0.15);
-    --bad: #d94e36;
-    --bad-bg: rgba(217, 78, 54, 0.15);
+  :root:not([data-theme="light"]) {
+    --ground: #131417;
+    --surface: #1a1c20;
+    --ink: #e8e6e1;
+    --ink-2: #b0b1b5;
+    --muted: #84868b;
+    --hairline: #2b2d31;
+    --hairline-soft: #232529;
+    --accent: #e8e6e1;
+    --accent-soft: rgba(232, 230, 225, 0.12);
+    --sobre-accent: #14161a;
+    --good: #35a76c;
+    --good-bg: rgba(53, 167, 108, 0.16);
+    --warn: #d08a2a;
+    --warn-bg: rgba(208, 138, 42, 0.15);
+    --bad: #e05a42;
+    --bad-bg: rgba(224, 90, 66, 0.15);
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 18px rgba(0, 0, 0, 0.25);
   }
+}
+
+:root[data-theme="dark"] {
+  --ground: #131417;
+  --surface: #1a1c20;
+  --ink: #e8e6e1;
+  --ink-2: #b0b1b5;
+  --muted: #84868b;
+  --hairline: #2b2d31;
+  --hairline-soft: #232529;
+  --accent: #e8e6e1;
+  --accent-soft: rgba(232, 230, 225, 0.12);
+  --sobre-accent: #14161a;
+  --good: #35a76c;
+  --good-bg: rgba(53, 167, 108, 0.16);
+  --warn: #d08a2a;
+  --warn-bg: rgba(208, 138, 42, 0.15);
+  --bad: #e05a42;
+  --bad-bg: rgba(224, 90, 66, 0.15);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 18px rgba(0, 0, 0, 0.25);
 }
 
 @theme inline {
@@ -52,6 +102,7 @@
   --color-hairline-soft: var(--hairline-soft);
   --color-accent: var(--accent);
   --color-accent-soft: var(--accent-soft);
+  --color-sobre-accent: var(--sobre-accent);
   --color-good: var(--good);
   --color-good-bg: var(--good-bg);
   --color-warn: var(--warn);

@@ -128,7 +128,7 @@ export function RegistroManual({
               type="button"
               onClick={guardar}
               disabled={guardando}
-              className="mt-3 w-full rounded-xl bg-accent px-4 py-3 text-base font-medium text-white disabled:opacity-50"
+              className="mt-3 w-full rounded-xl bg-accent px-4 py-3 text-base font-medium text-sobre-accent disabled:opacity-50"
             >
               {guardando ? "Guardando…" : "Guardar en el diario"}
             </button>

@@ -96,7 +96,7 @@ export function SubirGarmin() {
               e.target.value = "";
             }}
             aria-label="Elegir archivos CSV de Garmin"
-            className="block w-full text-sm text-ink-2 file:mr-3 file:rounded-lg file:border-0 file:bg-accent file:px-4 file:py-2 file:text-sm file:font-medium file:text-white"
+            className="block w-full text-sm text-ink-2 file:mr-3 file:rounded-lg file:border-0 file:bg-accent file:px-4 file:py-2 file:text-sm file:font-medium file:text-sobre-accent"
           />
           <p className="mt-3 text-xs text-muted">
             Podés soltar varios de una vez. Los rangos que se solapan se
@@ -200,7 +200,7 @@ export function SubirGarmin() {
             type="button"
             onClick={guardar}
             disabled={guardando}
-            className="mt-4 w-full rounded-xl bg-accent px-4 py-3 text-base font-medium text-white disabled:opacity-50"
+            className="mt-4 w-full rounded-xl bg-accent px-4 py-3 text-base font-medium text-sobre-accent disabled:opacity-50"
           >
             {guardando
               ? "Guardando…"

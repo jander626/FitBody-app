@@ -80,7 +80,7 @@ export function FormularioLogin({ destino }: { destino: string }) {
       <button
         type="submit"
         disabled={enviando || email.length === 0}
-        className="mt-4 w-full rounded-xl bg-accent px-4 py-3 text-base font-medium text-white transition-opacity disabled:opacity-50"
+        className="mt-4 w-full rounded-xl bg-accent px-4 py-3 text-base font-medium text-sobre-accent transition-opacity disabled:opacity-50"
       >
         {enviando ? "Enviando…" : "Enviarme el enlace"}
       </button>

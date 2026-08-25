@@ -272,7 +272,7 @@ export function Conversacion({
           type="button"
           onClick={() => enviar(texto)}
           disabled={pensando || (!foto && texto.trim().length === 0)}
-          className="w-full rounded-xl bg-accent px-4 py-3 text-base font-medium text-white disabled:opacity-50"
+          className="w-full rounded-xl bg-accent px-4 py-3 text-base font-medium text-sobre-accent disabled:opacity-50"
         >
           {pensando ? "Estimando…" : "Estimar"}
         </button>
@@ -401,7 +401,7 @@ export function Conversacion({
           type="button"
           onClick={guardar}
           disabled={guardando || items.length === 0}
-          className="mt-3 w-full rounded-xl bg-accent px-4 py-3 text-base font-medium text-white disabled:opacity-50"
+          className="mt-3 w-full rounded-xl bg-accent px-4 py-3 text-base font-medium text-sobre-accent disabled:opacity-50"
         >
           {guardando ? "Guardando…" : "Guardar en el diario"}
         </button>

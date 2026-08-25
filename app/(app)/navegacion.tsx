@@ -43,7 +43,7 @@ export function NavegacionInferior() {
                 <span
                   className={
                     principal
-                      ? "flex size-9 items-center justify-center rounded-full bg-accent text-white"
+                      ? "flex size-9 items-center justify-center rounded-full bg-accent text-sobre-accent"
                       : "flex size-9 items-center justify-center"
                   }
                 >

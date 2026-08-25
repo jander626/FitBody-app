@@ -189,7 +189,7 @@ export function EditarComida({
               type="button"
               onClick={guardar}
               disabled={trabajando || items.length === 0}
-              className="mt-3 w-full rounded-xl bg-accent px-4 py-3 text-base font-medium text-white disabled:opacity-50"
+              className="mt-3 w-full rounded-xl bg-accent px-4 py-3 text-base font-medium text-sobre-accent disabled:opacity-50"
             >
               {trabajando ? "Guardando…" : "Guardar los cambios"}
             </button>

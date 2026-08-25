@@ -141,7 +141,7 @@ export function FormularioPerfil({
       <button
         type="submit"
         disabled={enviando}
-        className="w-full rounded-xl bg-accent px-4 py-3 text-base font-medium text-white disabled:opacity-50"
+        className="w-full rounded-xl bg-accent px-4 py-3 text-base font-medium text-sobre-accent disabled:opacity-50"
       >
         {enviando ? "Guardando…" : "Guardar y recalcular"}
       </button>

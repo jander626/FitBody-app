@@ -147,7 +147,7 @@ export function VistaHoy({
               </p>
               <Link
                 href="/registrar"
-                className="mt-3 block rounded-xl bg-accent px-4 py-3 text-center text-base font-medium text-white"
+                className="mt-3 block rounded-xl bg-accent px-4 py-3 text-center text-base font-medium text-sobre-accent"
               >
                 Registrar una comida
               </Link>

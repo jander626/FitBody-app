@@ -89,10 +89,18 @@ export function VistaHoy({
 
       <div className="space-y-6 px-5">
         {!objetivo && (
-          <Aviso nivel="info">
-            Todavía no hay un objetivo configurado. Andá a Perfil para calcular
-            tu plan y ver cuánto te queda cada día.
-          </Aviso>
+          <div>
+            <Aviso nivel="info">
+              Todavía no hay un objetivo configurado. Sin él no se puede decir
+              cuánto te queda cada día.
+            </Aviso>
+            <Link
+              href="/objetivo"
+              className="mt-3 block rounded-xl bg-accent px-4 py-3 text-center text-base font-medium text-sobre-accent"
+            >
+              Calcular mi plan
+            </Link>
+          </div>
         )}
 
         {objetivo && (

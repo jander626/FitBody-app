@@ -18,6 +18,12 @@ const Esquema = z.object({
   objetivo: z.enum(["perder_grasa", "mantener", "ganar_musculo"]),
   deficitPct: z.coerce.number().min(-30).max(40),
   pesoMetaKg: z.coerce.number().min(20).max(400).optional(),
+  // Los diales de macros. El formulario de Perfil no los manda y ahí valen
+  // los de siempre; la encuesta sí, porque tonificar lleva más proteína que
+  // bajar de peso. Los topes son de seguridad: nadie necesita 4 g/kg de
+  // proteína, y bajo 0.6 g/kg de grasa se resiente lo hormonal.
+  proteinaGPorKg: z.coerce.number().min(0.8).max(4).optional(),
+  grasaGPorKg: z.coerce.number().min(0.6).max(2).optional(),
 });
 
 export type ResultadoGuardar =
@@ -35,9 +41,14 @@ export async function guardarPerfil(
   if (!user) return { ok: false, error: "La sesión venció. Entrá de nuevo." };
 
   const crudo = Object.fromEntries(datos);
+  const vacioEsAusente = (clave: string) =>
+    crudo[clave] === "" || crudo[clave] === undefined ? undefined : crudo[clave];
+
   const analisis = Esquema.safeParse({
     ...crudo,
-    pesoMetaKg: crudo.pesoMetaKg === "" ? undefined : crudo.pesoMetaKg,
+    pesoMetaKg: vacioEsAusente("pesoMetaKg"),
+    proteinaGPorKg: vacioEsAusente("proteinaGPorKg"),
+    grasaGPorKg: vacioEsAusente("grasaGPorKg"),
   });
 
   if (!analisis.success) {
@@ -60,6 +71,10 @@ export async function guardarPerfil(
     v.factorActividad,
     v.objetivo,
     v.deficitPct,
+    {
+      ...(v.proteinaGPorKg !== undefined && { proteinaGPorKg: v.proteinaGPorKg }),
+      ...(v.grasaGPorKg !== undefined && { grasaGPorKg: v.grasaGPorKg }),
+    },
   );
 
   const { error: errPerfil } = await supabase

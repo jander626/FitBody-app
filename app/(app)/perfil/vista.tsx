@@ -102,7 +102,26 @@ export function VistaPerfil({
         )}
 
         <div>
+          <TituloSeccion>Tu objetivo</TituloSeccion>
+          <Tarjeta>
+            <p className="text-sm text-ink-2">
+              Contestá cuatro preguntas y la app calcula tus calorías y macros.
+              No hace falta saber qué es un factor de actividad.
+            </p>
+            <Link
+              href="/objetivo"
+              className="mt-3 block rounded-xl bg-accent px-4 py-3 text-center text-base font-medium text-sobre-accent"
+            >
+              {objetivo ? "Volver a calcular mi plan" : "Calcular mi plan"}
+            </Link>
+          </Tarjeta>
+        </div>
+
+        <div>
           <TituloSeccion>Tus datos</TituloSeccion>
+          <p className="mb-2 px-1 text-xs text-muted">
+            Los mismos números, para moverlos a mano.
+          </p>
           <Tarjeta>
             <FormularioPerfil
               perfil={perfil}

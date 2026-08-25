@@ -35,6 +35,17 @@
   --bad: #c2321b;
   --bad-bg: rgba(194, 50, 27, 0.12);
   --shadow: 0 1px 2px rgba(20, 20, 18, 0.05), 0 6px 18px rgba(20, 20, 18, 0.05);
+  /* El velo que aparece al tocar. Sobre papel se oscurece.
+     Tres intensidades: el hover con mouse es una insinuación, la pulsación se
+     tiene que ver bajo el dedo, y la reforzada es para quien pidió menos
+     movimiento y no va a tener el encogido que acompaña. */
+  --pulsacion-suave: rgba(28, 29, 33, 0.05);
+  --pulsacion: rgba(28, 29, 33, 0.11);
+  --pulsacion-fuerte: rgba(28, 29, 33, 0.18);
+  /* Sobre el acento el velo va al revés. En tema claro el botón principal es
+     casi negro, y un velo negro encima no se ve: el tinte tiene que
+     contrastar con lo que hay debajo, no oscurecer siempre. */
+  --pulsacion-sobre-accent: rgba(255, 255, 255, 0.22);
 }
 
 /*
@@ -69,6 +80,12 @@
     --bad: #e05a42;
     --bad-bg: rgba(224, 90, 66, 0.15);
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 18px rgba(0, 0, 0, 0.25);
+    /* Sobre carbón se aclara: oscurecer lo oscuro no se ve. */
+    --pulsacion-suave: rgba(232, 230, 225, 0.07);
+    --pulsacion: rgba(232, 230, 225, 0.15);
+    --pulsacion-fuerte: rgba(232, 230, 225, 0.24);
+    /* En oscuro el botón es hueso: ahí el velo oscurece. */
+    --pulsacion-sobre-accent: rgba(0, 0, 0, 0.16);
   }
 }
 
@@ -90,6 +107,10 @@
   --bad: #e05a42;
   --bad-bg: rgba(224, 90, 66, 0.15);
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 18px rgba(0, 0, 0, 0.25);
+  --pulsacion-suave: rgba(232, 230, 225, 0.07);
+  --pulsacion: rgba(232, 230, 225, 0.15);
+  --pulsacion-fuerte: rgba(232, 230, 225, 0.24);
+  --pulsacion-sobre-accent: rgba(0, 0, 0, 0.16);
 }
 
 @theme inline {
@@ -152,10 +173,10 @@ body {
    todos: una app donde unos botones responden y otros no se siente peor que
    una donde ninguno responde.
 
-   Encoger un poco es la señal más legible en una pantalla táctil: el dedo
-   tapa el elemento, así que un cambio de color se ve menos que un cambio de
-   tamaño en el borde. Va acompañado de un oscurecido leve para los casos en
-   que el dedo tape justo los bordes.
+   Son dos señales juntas, y hacen falta las dos: el elemento encoge y además
+   se tiñe. Encoger se ve en el borde, que es lo único que el dedo no tapa; el
+   tinte se ve en todo lo demás, que es lo que se nota cuando el elemento es
+   grande y el dedo cubre solo una parte.
 
    La entrada es más rápida que la salida a propósito: la pulsación tiene que
    sentirse instantánea, y el regreso puede ser suave. */
@@ -167,26 +188,63 @@ summary,
 [role="button"] {
   transition:
     transform 140ms cubic-bezier(0.2, 0, 0, 1),
-    filter 140ms ease,
+    box-shadow 140ms ease,
     background-color 140ms ease,
     border-color 140ms ease;
 }
 
+/*
+ * La marca de pulsación.
+ *
+ * El tinte va como `box-shadow` interior gigante y no como `background`, y esa
+ * es la parte importante: así se ve sobre CUALQUIER elemento sin pisarle su
+ * propio fondo. Un `filter: brightness` no servía — sobre un enlace o una fila
+ * de lista, que no tienen fondo, no hay casi nada que oscurecer y el toque
+ * quedaba invisible. Justo donde más se notaba la falta.
+ *
+ * `[data-pulsado]` lo pone components/pulsacion.tsx. `:active` va al lado como
+ * respaldo para cuando el JS no llegó a montar: iOS Safari no aplica :active
+ * al tocar sin escuchas táctiles, así que solo con :active esto no funciona en
+ * el teléfono — que es donde vive la app.
+ */
+button[data-pulsado],
+a[data-pulsado],
+label[data-pulsado],
+summary[data-pulsado],
+select[data-pulsado],
+[role="button"][data-pulsado],
 button:active,
 a:active,
 label[for]:active,
 summary:active,
 [role="button"]:active {
-  transform: scale(0.97);
-  filter: brightness(0.93);
+  transform: scale(0.96);
+  box-shadow: inset 0 0 0 9999px var(--pulsacion);
   transition-duration: 60ms;
+}
+
+/*
+ * La excepción de los rellenos fuertes.
+ *
+ * Va después de la regla general a propósito: misma especificidad, gana la
+ * última. Un velo oscuro sobre un botón oscuro es invisible, así que acá se
+ * invierte — y como el acento cambia de claro a oscuro entre temas, el velo
+ * cambia con él.
+ */
+.bg-accent[data-pulsado],
+.bg-accent:active,
+.bg-bad[data-pulsado],
+.bg-bad:active {
+  box-shadow: inset 0 0 0 9999px var(--pulsacion-sobre-accent);
 }
 
 /* Un control apagado no debe fingir que responde. */
 button:disabled:active,
-[aria-disabled="true"]:active {
+button:disabled[data-pulsado],
+[aria-disabled="true"]:active,
+[aria-disabled="true"][data-pulsado] {
   transform: none;
-  filter: none;
+  box-shadow: none;
 }
 
 /* Sin puntero no hay hover: en el celular, un :hover se queda pegado después
@@ -195,7 +253,7 @@ button:disabled:active,
   button:hover:not(:disabled),
   a:hover,
   label[for]:hover {
-    filter: brightness(0.96);
+    box-shadow: inset 0 0 0 9999px var(--pulsacion-suave);
   }
 
   /* Después del bloque de hover a propósito: con la misma especificidad gana
@@ -206,7 +264,7 @@ button:disabled:active,
   label[for]:active,
   summary:active,
   [role="button"]:active {
-    filter: brightness(0.93);
+    box-shadow: inset 0 0 0 9999px var(--pulsacion);
   }
 }
 
@@ -227,12 +285,18 @@ button:disabled:active,
 
   /* Quien pide menos movimiento igual necesita saber que tocó algo: se cambia
      el brillo, que no es movimiento, en vez de quitar la respuesta entera. */
+  button[data-pulsado],
+  a[data-pulsado],
+  label[data-pulsado],
+  summary[data-pulsado],
+  select[data-pulsado],
+  [role="button"][data-pulsado],
   button:active,
   a:active,
   label[for]:active,
   summary:active,
   [role="button"]:active {
     transform: none;
-    filter: brightness(0.88);
+    box-shadow: inset 0 0 0 9999px var(--pulsacion-fuerte);
   }
 }

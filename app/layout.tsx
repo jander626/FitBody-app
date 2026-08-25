@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { COLOR_BARRA, GUION_TEMA } from "@/lib/tema";
+import { Pulsacion } from "@/components/pulsacion";
 import { RegistrarSW } from "./registrar-sw";
 
 export const metadata: Metadata = {
@@ -51,6 +52,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       </head>
       <body className="min-h-full">
         {children}
+        {/* Marca lo que se está tocando. Va en el layout raíz y no en el de la
+            app para que el login también responda al toque. */}
+        <Pulsacion />
         <RegistrarSW />
       </body>
     </html>

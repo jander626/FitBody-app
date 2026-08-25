@@ -74,6 +74,8 @@ create policy "métricas propias" on public.daily_metrics
 
 
 -- ------------------------------------------------------------ confirmar ---
+-- Si algo quedó mal, corta acá con una excepción. Es preferible un error a
+-- dejar datos de salud abiertos creyendo que salió bien.
 do $$
 declare
   con_rls boolean;
@@ -89,6 +91,14 @@ begin
   if not con_rls or politicas = 0 then
     raise exception 'La tabla quedó sin RLS. No sigas: tus datos quedarían abiertos.';
   end if;
-
-  raise notice '✓ listo: tabla daily_metrics creada, con RLS y % política(s)', politicas;
 end $$;
+
+-- El resultado va como SELECT, no como `raise notice`: el SQL Editor de
+-- Supabase muestra filas, no avisos. Con un notice la pantalla dice
+-- "Success. No rows returned" y uno se queda sin saber si funcionó.
+select
+  '✓ listo: tabla daily_metrics creada' as resultado,
+  (select count(*) from pg_policies
+     where schemaname = 'public' and tablename = 'daily_metrics') as politicas_rls,
+  (select count(*) from information_schema.columns
+     where table_schema = 'public' and table_name = 'daily_metrics') as columnas;

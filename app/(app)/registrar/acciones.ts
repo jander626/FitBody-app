@@ -117,5 +117,116 @@ export async function borrarComida(comidaId: string): Promise<ResultadoGuardar> 
   if (error) return { ok: false, error: error.message };
 
   revalidatePath("/hoy");
+  revalidatePath("/historial");
   return { ok: true, comidaId, kcal: 0 };
+}
+
+/**
+ * Reemplaza una comida ya guardada.
+ *
+ * Corregir después es tan parte del uso normal como registrar: uno pesa el
+ * arroz cuando ya se sentó a comer, o se acuerda del jugo a la noche. Sin esto
+ * la única salida era borrar y volver a cargar todo.
+ *
+ * Los ítems se borran y se vuelven a insertar en vez de actualizarse uno por
+ * uno. Editar significa también quitar y agregar filas, y casar dos listas por
+ * id es la clase de código donde se cuelan ítems huérfanos.
+ *
+ * Queda marcada como `corregido`. Es el dato que después dice cuánto hubo que
+ * arreglar de lo que estimó el modelo.
+ */
+export async function actualizarComida(
+  comidaId: string,
+  borrador: unknown,
+): Promise<ResultadoGuardar> {
+  const supabase = await clienteServidor();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "La sesión venció. Entrá de nuevo." };
+
+  const analisis = ComidaBorradorSchema.safeParse(borrador);
+  if (!analisis.success) {
+    const primero = analisis.error.issues[0];
+    return {
+      ok: false,
+      error: `Dato inválido en "${primero.path.join(".")}": ${primero.message}`,
+    };
+  }
+
+  const comida = analisis.data;
+
+  const conAmbas = comida.items.find(
+    (i) => i.porcionG !== null && i.porcionMl !== null,
+  );
+  if (conAmbas) {
+    return {
+      ok: false,
+      error: `"${conAmbas.alimento}" tiene gramos y mililitros a la vez. Dejá solo uno.`,
+    };
+  }
+
+  // Que la comida sea de quien la edita se comprueba en el update, con el
+  // filtro por user_id: si no es suya, no actualiza ninguna fila y se avisa.
+  const { data: actualizada, error: errComida } = await supabase
+    .from("meal_logs")
+    .update({
+      momento: comida.momento,
+      confianza: comida.confianza,
+      corregido: true,
+      nota: comida.nota,
+    })
+    .eq("id", comidaId)
+    .eq("user_id", user.id)
+    .select("id")
+    .maybeSingle();
+
+  if (errComida) return { ok: false, error: errComida.message };
+  if (!actualizada) {
+    return { ok: false, error: "Esa comida ya no existe." };
+  }
+
+  const { error: errBorrar } = await supabase
+    .from("meal_log_items")
+    .delete()
+    .eq("meal_log_id", comidaId)
+    .eq("user_id", user.id);
+  if (errBorrar) return { ok: false, error: errBorrar.message };
+
+  const { error: errItems } = await supabase.from("meal_log_items").insert(
+    comida.items.map((item, orden) => ({
+      meal_log_id: comidaId,
+      user_id: user.id,
+      food_id: item.foodId,
+      alimento: item.alimento,
+      porcion_g: item.porcionG,
+      porcion_ml: item.porcionMl,
+      kcal: item.kcal,
+      proteina_g: item.proteinaG,
+      carbs_g: item.carbsG,
+      grasa_g: item.grasaG,
+      nota: item.nota,
+      orden,
+    })),
+  );
+
+  // Si esto falla, la comida quedó sin ítems: cuenta cero y descuadra el día
+  // en silencio. Vale más decirlo fuerte que dejarlo pasar.
+  if (errItems) {
+    return {
+      ok: false,
+      error:
+        `No se pudieron guardar los ítems (${errItems.message}). ` +
+        `La comida quedó vacía: volvé a editarla para dejarla bien.`,
+    };
+  }
+
+  revalidatePath("/hoy");
+  revalidatePath("/historial");
+
+  return {
+    ok: true,
+    comidaId,
+    kcal: comida.items.reduce((n, i) => n + i.kcal, 0),
+  };
 }

@@ -219,6 +219,17 @@ function TarjetaComida({ comida }: { comida: ComidaDiario }) {
           </span>
         )}
         {comida.corregido && <span>corregida</span>}
+
+        {/*
+          Al final y discreto: corregir es frecuente, pero mirar el diario lo
+          es más. Que se vea sin competirle a los números.
+        */}
+        <Link
+          href={`/comida/${comida.id}`}
+          className="ml-auto text-accent underline-offset-4 hover:underline"
+        >
+          Corregir
+        </Link>
       </div>
 
       {comida.nota && (

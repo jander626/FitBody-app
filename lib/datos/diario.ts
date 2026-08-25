@@ -4,6 +4,14 @@ import { clienteServidor } from "@/lib/supabase/cliente-servidor";
 
 export interface ItemDiario {
   id: string;
+  /**
+   * El alimento de la tabla, cuando quedó enlazado.
+   *
+   * Hace falta para editar: con el enlace, mover la porción recalcula los
+   * macros desde la tabla; sin él, solo se pueden escalar los números que
+   * estimó el modelo.
+   */
+  foodId: string | null;
   alimento: string;
   porcionG: number | null;
   porcionMl: number | null;
@@ -76,8 +84,8 @@ export async function obtenerDia(userId: string, fecha: string): Promise<Dia> {
       .select(
         `id, momento, hora, confianza, origen, corregido, nota,
          meal_log_items (
-           id, alimento, porcion_g, porcion_ml, kcal, proteina_g, carbs_g,
-           grasa_g, nota_correccion, nota, orden
+           id, food_id, alimento, porcion_g, porcion_ml, kcal, proteina_g,
+           carbs_g, grasa_g, nota_correccion, nota, orden
          )`,
       )
       .eq("user_id", userId)
@@ -97,6 +105,7 @@ export async function obtenerDia(userId: string, fecha: string): Promise<Dia> {
         .sort((a, b) => a.orden - b.orden)
         .map((i) => ({
           id: i.id,
+          foodId: i.food_id,
           alimento: i.alimento,
           porcionG: i.porcion_g,
           porcionMl: i.porcion_ml,
@@ -141,6 +150,69 @@ export async function obtenerDia(userId: string, fecha: string): Promise<Dia> {
     comidas,
     totales: sumar(comidas.flatMap((c) => c.items)),
     objetivo,
+  };
+}
+
+/** Una comida sola, para editarla. Trae su fecha, que la lista no necesita. */
+export interface ComidaSuelta extends ComidaDiario {
+  fecha: string;
+}
+
+/**
+ * Busca una comida por su id.
+ *
+ * El filtro por `user_id` es redundante con el RLS, y va igual: si algún día
+ * alguien llama a esto con la clave de servicio, el RLS no lo frena y este
+ * filtro sí.
+ */
+export async function obtenerComida(
+  userId: string,
+  comidaId: string,
+): Promise<ComidaSuelta | null> {
+  const supabase = await clienteServidor();
+
+  const { data } = await supabase
+    .from("meal_logs")
+    .select(
+      `id, fecha, momento, hora, confianza, origen, corregido, nota,
+       meal_log_items (
+         id, food_id, alimento, porcion_g, porcion_ml, kcal, proteina_g,
+         carbs_g, grasa_g, nota_correccion, nota, orden
+       )`,
+    )
+    .eq("id", comidaId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (!data) return null;
+
+  const items: ItemDiario[] = [...(data.meal_log_items ?? [])]
+    .sort((a, b) => a.orden - b.orden)
+    .map((i) => ({
+      id: i.id,
+      foodId: i.food_id,
+      alimento: i.alimento,
+      porcionG: i.porcion_g,
+      porcionMl: i.porcion_ml,
+      kcal: i.kcal,
+      proteinaG: i.proteina_g,
+      carbsG: i.carbs_g,
+      grasaG: i.grasa_g,
+      notaCorreccion: i.nota_correccion,
+      nota: i.nota,
+    }));
+
+  return {
+    id: data.id,
+    fecha: data.fecha,
+    momento: data.momento,
+    hora: data.hora,
+    confianza: data.confianza as ComidaDiario["confianza"],
+    origen: data.origen,
+    corregido: data.corregido,
+    nota: data.nota,
+    items,
+    subtotal: sumar(items),
   };
 }
 

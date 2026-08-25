@@ -191,11 +191,17 @@ export function Conversacion({
   if (!estimacion) {
     return (
       <div className="space-y-4">
+        {/*
+          Sin `capture`: con ese atributo el celular abre la cámara directo y
+          no deja llegar a la galería. Muchas comidas se fotografían en el
+          momento y se registran después —en la mesa uno come, no teclea—, y
+          esa foto ya está en el carrete. Sin el atributo, el sistema ofrece
+          las dos: cámara o galería.
+        */}
         <input
           ref={inputFoto}
           type="file"
           accept="image/*"
-          capture="environment"
           onChange={elegirFoto}
           className="sr-only"
           id="foto"

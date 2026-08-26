@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { calcularPlan } from "@/lib/nutrition";
+import { fechaDeHoy } from "@/lib/datos/diario";
 import { clienteServidor } from "@/lib/supabase/cliente-servidor";
 
 /**
@@ -88,7 +89,9 @@ export async function guardarPerfil(
   if (errPerfil) return { ok: false, error: errPerfil.message };
 
   // El peso de hoy: si ya te pesaste, esto lo corrige en vez de duplicarlo.
-  const hoy = new Date().toISOString().slice(0, 10);
+  // La fecha va en la zona de quien lo guarda, no en UTC: pesarse de noche
+  // habría escrito el peso en el día siguiente.
+  const hoy = await fechaDeHoy();
   const { error: errPeso } = await supabase.from("weight_logs").upsert(
     {
       user_id: user.id,

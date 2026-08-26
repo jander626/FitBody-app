@@ -191,6 +191,11 @@ export async function actualizarComida(
   const { data: actualizada, error: errComida } = await supabase
     .from("meal_logs")
     .update({
+      // La fecha también se puede mover. Hace falta para reparar lo que dejó
+      // el error de zona horaria —cenas escritas en el día siguiente—, y
+      // porque registrar algo al día siguiente y tener que ponerle la fecha
+      // correcta es un caso normal, no una excepción.
+      fecha: comida.fecha,
       momento: comida.momento,
       confianza: comida.confianza,
       corregido: true,

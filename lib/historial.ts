@@ -109,8 +109,6 @@ export function promedios(dias: ResumenDia[]) {
   };
 }
 
-const DIA_MS = 86_400_000;
-
 /** Días de un mes, alineados a semanas que empiezan en lunes. */
 export function cuadriculaMes(anio: number, mes: number): (string | null)[] {
   const primero = new Date(Date.UTC(anio, mes, 1));
@@ -134,6 +132,8 @@ export function sumarMeses(anio: number, mes: number, delta: number) {
   return { anio: d.getUTCFullYear(), mes: d.getUTCMonth() };
 }
 
-export function hoyMenos(dias: number): string {
-  return new Date(Date.now() - dias * DIA_MS).toISOString().slice(0, 10);
-}
+// Acá vivía `hoyMenos(dias)`, que calculaba en UTC a partir de "ahora" y por
+// tanto tenía el mismo error de zona que el resto: cerca de medianoche
+// devolvía el día equivocado. No la llamaba nadie, así que se va en vez de
+// arreglarse — si vuelve a hacer falta, tiene que recibir la fecha de hoy ya
+// resuelta en la zona correcta, no calcularla por su cuenta.

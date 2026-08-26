@@ -54,6 +54,7 @@ export function EditarComida({
     })),
   );
   const [momento, setMomento] = useState(comida.momento);
+  const [fecha, setFecha] = useState(comida.fecha);
   const [consulta, setConsulta] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [confirmandoBorrado, setConfirmandoBorrado] = useState(false);
@@ -64,8 +65,10 @@ export function EditarComida({
     ? buscarAlimentos(alimentos, consulta, 8)
     : [];
 
-  const volver = () =>
-    router.push(`/hoy?fecha=${comida.fecha}` as never);
+  // Al día donde quedó la comida, no al que estaba: si se movió de fecha,
+  // volver al viejo mostraría una pantalla sin ella y parecería que se perdió.
+  const volver = (destino: string = fecha) =>
+    router.push(`/hoy?fecha=${destino}` as never);
 
   function agregar(alimento: Alimento) {
     const gramos = porcionSugerida(alimento);
@@ -88,7 +91,7 @@ export function EditarComida({
     setError(null);
     iniciar(async () => {
       const r = await actualizarComida(comida.id, {
-        fecha: comida.fecha,
+        fecha,
         momento,
         origen: comida.origen,
         confianza: comida.confianza,
@@ -113,7 +116,9 @@ export function EditarComida({
         setError(r.error);
         return;
       }
-      volver();
+      // Al día original: la comida ya no existe, y llevar al día que se estaba
+      // editando mostraría una fecha que nunca la tuvo.
+      volver(comida.fecha);
     });
   }
 
@@ -169,6 +174,16 @@ export function EditarComida({
                 </span>
               </span>
             </div>
+
+            <label className="mt-3 block">
+              <span className="text-sm font-medium text-ink-2">Día</span>
+              <input
+                type="date"
+                value={fecha}
+                onChange={(e) => setFecha(e.target.value || comida.fecha)}
+                className={claseControl}
+              />
+            </label>
 
             <label className="mt-3 block">
               <span className="text-sm font-medium text-ink-2">Momento</span>

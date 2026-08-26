@@ -13,7 +13,7 @@ export default async function Historial() {
   return (
     <VistaHistorial
       historial={await obtenerHistorial(usuario.id)}
-      hoy={fechaDeHoy()}
+      hoy={await fechaDeHoy()}
     />
   );
 }

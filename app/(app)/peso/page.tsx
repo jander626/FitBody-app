@@ -10,6 +10,6 @@ export default async function Peso() {
   const usuario = await usuarioActual();
   if (!usuario) redirect("/login");
 
-  const hoy = fechaDeHoy();
+  const hoy = await fechaDeHoy();
   return <VistaPeso estado={await obtenerEstadoPeso(usuario.id, hoy)} fecha={hoy} />;
 }

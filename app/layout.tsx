@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { COLOR_BARRA, GUION_TEMA } from "@/lib/tema";
 import { Pulsacion } from "@/components/pulsacion";
+import { ZonaHoraria } from "@/components/zona-horaria";
 import { RegistrarSW } from "./registrar-sw";
 
 export const metadata: Metadata = {
@@ -55,6 +56,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         {/* Marca lo que se está tocando. Va en el layout raíz y no en el de la
             app para que el login también responda al toque. */}
         <Pulsacion />
+        {/* Le dice al servidor en qué huso horario está el teléfono. Sin esto
+            el servidor calcula "hoy" en UTC y las cenas caen al día
+            siguiente. */}
+        <ZonaHoraria />
         <RegistrarSW />
       </body>
     </html>

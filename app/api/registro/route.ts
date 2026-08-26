@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
   }
 
   // --- contexto ---
-  const hoy = fechaDeHoy();
+  const hoy = await fechaDeHoy();
   const [alimentos, dia] = await Promise.all([
     listarAlimentos(),
     obtenerDia(user.id, hoy),

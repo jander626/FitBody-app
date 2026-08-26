@@ -10,7 +10,7 @@ export default async function Hoy(props: PageProps<"/hoy">) {
   if (!usuario) redirect("/login");
 
   const { fecha } = await props.searchParams;
-  const hoy = fechaDeHoy();
+  const hoy = await fechaDeHoy();
   // Permite mirar días anteriores con ?fecha=AAAA-MM-DD sin abrir otra pantalla.
   const dia =
     typeof fecha === "string" && /^\d{4}-\d{2}-\d{2}$/.test(fecha) ? fecha : hoy;

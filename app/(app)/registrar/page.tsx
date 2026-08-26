@@ -13,7 +13,7 @@ export default async function Registrar() {
   return (
     <VistaRegistrar
       alimentos={await listarAlimentos()}
-      fecha={fechaDeHoy()}
+      fecha={await fechaDeHoy()}
       userId={usuario.id}
     />
   );

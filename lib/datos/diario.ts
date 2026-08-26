@@ -1,6 +1,8 @@
 import "server-only";
 
+import { cookies } from "next/headers";
 import { clienteServidor } from "@/lib/supabase/cliente-servidor";
+import { COOKIE_ZONA, fechaEnZona, zonaSegura } from "@/lib/zona";
 import { urlsDeFotos } from "./fotos";
 
 export interface ItemDiario {
@@ -237,7 +239,15 @@ export async function obtenerComida(
   };
 }
 
-/** Fecha de hoy en AAAA-MM-DD, según la zona horaria del servidor. */
-export function fechaDeHoy(): string {
-  return new Date().toISOString().slice(0, 10);
+/**
+ * Qué día es hoy para quien está mirando, en AAAA-MM-DD.
+ *
+ * Es asíncrona porque lee la cookie con la zona del navegador. Antes devolvía
+ * la fecha en UTC, y eso ponía las cenas colombianas en el día siguiente: a
+ * las 7 de la tarde el servidor ya había cambiado de día.
+ */
+export async function fechaDeHoy(): Promise<string> {
+  const galletas = await cookies();
+  const zona = zonaSegura(galletas.get(COOKIE_ZONA)?.value, process.env);
+  return fechaEnZona(zona);
 }

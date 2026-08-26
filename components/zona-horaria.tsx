@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { COOKIE_ZONA } from "@/lib/zona";
+import { aValorDeCookie, COOKIE_ZONA, zonaDeCookies } from "@/lib/zona";
 
 /**
  * Le dice al servidor en qué zona horaria estás.
@@ -20,18 +20,39 @@ import { COOKIE_ZONA } from "@/lib/zona";
 
 const UN_ANIO = 60 * 60 * 24 * 365;
 
+/** Marca de "ya recargué por esta zona", por pestaña. Ver `recargarUnaVez`. */
+const CLAVE_RECARGA = "fitfood-zona-recargada";
+
+/**
+ * Recarga como mucho una vez por zona y por pestaña.
+ *
+ * La recarga arregla la pantalla que se pintó con la zona vieja, pero es una
+ * herramienta peligrosa: si la condición que la dispara nunca se apaga, la
+ * página se recarga sin parar y la app queda inservible —el campo del correo
+ * se borra solo, y el refresco de sesión termina cerrándola. Ya pasó. Este
+ * seguro hace que el peor caso sea una recarga de más, no infinitas.
+ */
+function recargarUnaVez(zona: string) {
+  try {
+    if (sessionStorage.getItem(CLAVE_RECARGA) === zona) return;
+    sessionStorage.setItem(CLAVE_RECARGA, zona);
+  } catch {
+    // Sin sessionStorage (Safari privado) no hay seguro que valga: mejor no
+    // recargar. Se pierde la corrección de la primera carga, no la app.
+    return;
+  }
+  window.location.reload();
+}
+
 export function ZonaHoraria() {
   useEffect(() => {
     try {
       const zona = Intl.DateTimeFormat().resolvedOptions().timeZone;
       if (!zona) return;
 
-      const yaEsta = document.cookie
-        .split("; ")
-        .find((c) => c.startsWith(`${COOKIE_ZONA}=`))
-        ?.slice(COOKIE_ZONA.length + 1);
+      const yaEsta = zonaDeCookies(document.cookie);
 
-      document.cookie = `${COOKIE_ZONA}=${encodeURIComponent(zona)}; path=/; max-age=${UN_ANIO}; samesite=lax`;
+      document.cookie = `${COOKIE_ZONA}=${aValorDeCookie(zona)}; path=/; max-age=${UN_ANIO}; samesite=lax`;
 
       // Si cambió de verdad, lo que ya está pintado quedó con la fecha vieja.
       // Pasa al viajar, y la primera vez que se abre la app: hasta ese momento
@@ -39,7 +60,7 @@ export function ZonaHoraria() {
       if (yaEsta !== zona) {
         // Un reload y no router.refresh(): la fecha se calcula en el servidor
         // durante el render, y refresh() reusa la respuesta ya generada.
-        window.location.reload();
+        recargarUnaVez(zona);
       }
     } catch {
       // Sin cookies ni Intl, el servidor usa la zona configurada. La app

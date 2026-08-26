@@ -7,7 +7,15 @@
  * que nada avisara. Por eso vale fijarlo con casos concretos.
  */
 import { describe, expect, it } from "vitest";
-import { esZonaValida, fechaEnZona, zonaSegura, ZONA_POR_DEFECTO } from "@/lib/zona";
+import {
+  aValorDeCookie,
+  COOKIE_ZONA,
+  esZonaValida,
+  fechaEnZona,
+  zonaDeCookies,
+  zonaSegura,
+  ZONA_POR_DEFECTO,
+} from "@/lib/zona";
 
 describe("la cena de las 8:48 PM", () => {
   // El caso real: cena registrada el martes 25 a las 20:48 en Colombia.
@@ -74,6 +82,54 @@ describe("validar lo que llega del navegador", () => {
     expect(esZonaValida("Marte/Olimpo")).toBe(false);
     expect(esZonaValida("")).toBe(false);
     expect(esZonaValida("'; drop table foods; --")).toBe(false);
+  });
+});
+
+describe("la cookie: lo que se escribe es lo que se lee", () => {
+  // Este bloque existe por un bug que llegó a producción. La cookie se
+  // guardaba codificada y se comparaba contra la zona sin decodificar, así
+  // que la comparación *nunca* podía dar igual: la app se recargaba a sí
+  // misma en bucle —144 veces en 6 segundos medidas en un navegador real— y
+  // el campo del correo del login se borraba solo. Nadie podía entrar.
+  //
+  // La invariante que faltaba es de una línea: lo que se escribe tiene que
+  // volver idéntico. Se prueba con las zonas de verdad, que todas llevan
+  // barra, que es el carácter que se codifica.
+  const zonas = [
+    "America/Bogota",
+    "Asia/Tokyo",
+    "Pacific/Honolulu",
+    "America/Argentina/Buenos_Aires",
+    "UTC",
+  ];
+
+  it.each(zonas)("%s vuelve igual de la cookie", (zona) => {
+    const cookies = `otra=cosa; ${COOKIE_ZONA}=${aValorDeCookie(zona)}; tema=oscuro`;
+    expect(zonaDeCookies(cookies)).toBe(zona);
+  });
+
+  it("la barra sí se codifica al guardar", () => {
+    // Si algún día esto deja de ser cierto, el test de arriba pasa por la
+    // razón equivocada. Acá queda explícito qué es lo que se está sorteando.
+    expect(aValorDeCookie("America/Bogota")).toBe("America%2FBogota");
+  });
+
+  it("sin la cookie devuelve null, no una cadena vacía", () => {
+    // Importa la diferencia: null significa "primera visita" y dispara la
+    // corrección; "" sería un valor que compararía mal contra cualquier zona.
+    expect(zonaDeCookies("tema=oscuro; otra=cosa")).toBeNull();
+    expect(zonaDeCookies("")).toBeNull();
+    expect(zonaDeCookies(undefined)).toBeNull();
+  });
+
+  it("no confunde una cookie cuyo nombre empieza igual", () => {
+    expect(zonaDeCookies(`${COOKIE_ZONA}-vieja=Asia%2FTokyo`)).toBeNull();
+  });
+
+  it("un valor corrupto no lanza", () => {
+    // Un % suelto hace lanzar a decodeURIComponent. Preferimos devolver algo
+    // que no coincide —una corrección de más— a tumbar el componente.
+    expect(() => zonaDeCookies(`${COOKIE_ZONA}=100%`)).not.toThrow();
   });
 });
 

@@ -57,6 +57,44 @@ export function zonaSegura(
 }
 
 /**
+ * Cómo se escribe la zona dentro de la cookie.
+ *
+ * Hay que codificar porque la barra de "America/Bogota" no es un carácter
+ * cualquiera en una cookie, y quien la lea del lado del servidor la va a
+ * decodificar.
+ */
+export function aValorDeCookie(zona: string): string {
+  return encodeURIComponent(zona);
+}
+
+/**
+ * La zona guardada en `document.cookie`, ya decodificada. Null si no está.
+ *
+ * Existe como función suelta y testeable por un motivo concreto: el navegador
+ * devuelve la cookie *tal como se guardó*, es decir codificada, y compararla
+ * sin decodificar es comparar "America%2FBogota" con "America/Bogota" y
+ * concluir que son distintas. Eso pasó en producción: la app se recargaba a sí
+ * misma sin parar —144 veces en 6 segundos— porque la comparación nunca podía
+ * dar igual. Dejaba la pantalla de login inservible.
+ */
+export function zonaDeCookies(
+  cookies: string | undefined | null,
+): string | null {
+  const cruda = (cookies ?? "")
+    .split("; ")
+    .find((c) => c.startsWith(`${COOKIE_ZONA}=`))
+    ?.slice(COOKIE_ZONA.length + 1);
+  if (cruda === undefined) return null;
+  try {
+    return decodeURIComponent(cruda);
+  } catch {
+    // Un %  suelto hace lanzar a decodeURIComponent. Devolver lo crudo es
+    // mejor que lanzar: como mucho no coincide y se corrige una vez.
+    return cruda;
+  }
+}
+
+/**
  * La fecha de un instante, en una zona, como AAAA-MM-DD.
  *
  * `en-CA` no es una elección estética: es el único idioma común cuyo formato

@@ -19,6 +19,18 @@ La conversación no es un adorno. Los registros históricos están llenos de
 no queso costeño"* o *"dejó 1 de las 3 tortitas sin comer"*. Ninguna de esas
 correcciones sale de una foto: salen de que alguien preguntó.
 
+## Dónde vive
+
+**https://fitfood-six.vercel.app**
+
+Se despliega solo con cada empujón a la rama del proyecto. Instalable desde el
+navegador del celular: *Compartir* → *Agregar a pantalla de inicio*.
+
+Esa misma dirección tiene que estar en Supabase → **Authentication** → **URL
+Configuration**, como *Site URL* y con `/auth/callback` en *Redirect URLs*. Sin
+eso el enlace del correo lleva a `localhost` y desde el celular no abre nada — es
+el paso que más se olvida.
+
 ## Puesta en marcha
 
 ```bash

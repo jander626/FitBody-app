@@ -60,15 +60,22 @@ export function VistaRegistrar({
           ))}
         </div>
 
-        {modo === "asistido" ? (
-          <Conversacion
-            alimentos={alimentos}
-            fecha={fecha}
-            userId={userId}
-          />
-        ) : (
+        {/*
+          Los dos modos quedan montados y solo se esconde uno.
+
+          Antes esto era un ternario que montaba uno y desmontaba el otro, y
+          React tira el estado de lo que desmonta. O sea: estimabas una foto,
+          te pasabas a "Buscar en la tabla" para verificar una cantidad, y al
+          volver no quedaba nada — se había ido una estimación que costó una
+          de las veinte llamadas del día. Esconder en vez de desmontar lo
+          arregla entero, sin guardar nada en ninguna parte.
+        */}
+        <div className={modo === "asistido" ? undefined : "hidden"}>
+          <Conversacion alimentos={alimentos} fecha={fecha} userId={userId} />
+        </div>
+        <div className={modo === "manual" ? undefined : "hidden"}>
           <RegistroManual alimentos={alimentos} fecha={fecha} />
-        )}
+        </div>
       </div>
     </>
   );

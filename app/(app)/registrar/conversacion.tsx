@@ -4,6 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Aviso, Tarjeta, TituloSeccion, claseControl } from "@/components/ui";
 import { EditorItems, type ItemEditable } from "@/components/editor-items";
+import { useHidratado } from "@/components/hidratado";
 import type { Alimento } from "@/lib/alimentos";
 import { comprimirFoto } from "@/lib/foto";
 import { LIMITES } from "@/lib/guardrails/limites";
@@ -14,17 +15,16 @@ import {
   totalesDeItems,
   type ItemBorrador,
 } from "@/lib/registro/tipos";
+import {
+  guardarBorrador,
+  guardarFoto,
+  leerBorrador,
+  leerFoto,
+  limpiarBorrador,
+  type Estimacion,
+} from "@/lib/registro/borrador";
 import { clienteNavegador } from "@/lib/supabase/cliente-navegador";
 import { guardarComida } from "./acciones";
-
-interface Estimacion {
-  sessionId: string;
-  momento: (typeof MOMENTOS)[number];
-  confianza: "alta" | "media" | "baja";
-  preguntas: string[];
-  nota: string;
-  turnosRestantes: number;
-}
 
 const NOMBRE_CONFIANZA: Record<string, string> = {
   alta: "Confianza alta",
@@ -32,7 +32,40 @@ const NOMBRE_CONFIANZA: Record<string, string> = {
   baja: "Confianza baja",
 };
 
-export function Conversacion({
+/** Lo que sobrevive a que se caiga la pantalla. El resto es de esta sesión. */
+interface EstadoBorrador {
+  texto: string;
+  momento: (typeof MOMENTOS)[number];
+  estimacion: Estimacion | null;
+  items: ItemEditable[];
+}
+
+export function Conversacion(props: {
+  alimentos: Alimento[];
+  fecha: string;
+  userId: string;
+}) {
+  // El borrador vive en localStorage, que en el servidor no existe. Montar el
+  // formulario recién después de hidratar evita que el servidor pinte uno
+  // vacío y el cliente uno con lo recuperado: para React eso es HTML que no
+  // corresponde, y tiene razón.
+  const hidratado = useHidratado();
+  if (!hidratado) return <Esqueleto />;
+  return <Formulario {...props} />;
+}
+
+/** Del alto del formulario vacío, para que no salte al aparecer. */
+function Esqueleto() {
+  return (
+    <div className="space-y-4" aria-hidden>
+      <div className="h-[74px] rounded-2xl border border-dashed border-hairline bg-surface" />
+      <div className="h-[88px] rounded-xl border border-hairline bg-surface" />
+      <div className="h-[50px] rounded-xl bg-surface opacity-50" />
+    </div>
+  );
+}
+
+function Formulario({
   alimentos,
   fecha,
   userId,
@@ -44,13 +77,23 @@ export function Conversacion({
   const router = useRouter();
   const inputFoto = useRef<HTMLInputElement>(null);
 
-  const [texto, setTexto] = useState("");
-  const [foto, setFoto] = useState<{ url: string; base64: string } | null>(null);
-  const [estimacion, setEstimacion] = useState<Estimacion | null>(null);
-  const [items, setItems] = useState<ItemEditable[]>([]);
-  const [momento, setMomento] = useState(() =>
-    momentoSugerido(new Date().getHours()),
+  const [recuperado] = useState(() => leerBorrador({ fecha }));
+  const [estado, setEstado] = useState<EstadoBorrador>(() =>
+    recuperado
+      ? { ...recuperado, items: recuperado.items.map(conClave) }
+      : {
+          texto: "",
+          momento: momentoSugerido(new Date().getHours()),
+          estimacion: null,
+          items: [],
+        },
   );
+  const [foto, setFoto] = useState<{ base64: string } | null>(() => {
+    const guardada = leerFoto();
+    return guardada ? { base64: guardada } : null;
+  });
+  const [avisoRecuperado, setAvisoRecuperado] = useState(recuperado !== null);
+
   const [error, setError] = useState<string | null>(null);
   const [fueraDeTema, setFueraDeTema] = useState<string | null>(null);
   /** La foto se estimó pero no se pudo archivar. Se avisa sin bloquear. */
@@ -58,8 +101,35 @@ export function Conversacion({
   const [pensando, setPensando] = useState(false);
   const [guardando, iniciarGuardado] = useTransition();
 
+  const { texto, momento, estimacion, items } = estado;
   const totales = totalesDeItems(items);
   const sinTurnos = estimacion !== null && estimacion.turnosRestantes <= 0;
+
+  /**
+   * Cambia el estado y lo deja escrito, en ese orden y sin efectos.
+   *
+   * Va acá y no en un `useEffect` porque persistir es la consecuencia de una
+   * acción concreta, no de que el render haya terminado. `estado` sale del
+   * cierre del render actual, que es el bueno: todas las llamadas vienen de
+   * manejadores de eventos.
+   */
+  function actualizar(cambio: Partial<EstadoBorrador>) {
+    const siguiente = { ...estado, ...cambio };
+    setEstado(siguiente);
+    guardarBorrador({
+      fecha,
+      texto: siguiente.texto,
+      momento: siguiente.momento,
+      estimacion: siguiente.estimacion,
+      items: siguiente.items.map(aItemBorrador),
+    });
+  }
+
+  function ponerFoto(base64: string | null) {
+    setFoto(base64 ? { base64 } : null);
+    guardarFoto(base64);
+    if (base64 === null && inputFoto.current) inputFoto.current.value = "";
+  }
 
   async function elegirFoto(evento: React.ChangeEvent<HTMLInputElement>) {
     const archivo = evento.target.files?.[0];
@@ -67,10 +137,7 @@ export function Conversacion({
     setError(null);
     try {
       const comprimida = await comprimirFoto(archivo);
-      setFoto({
-        url: URL.createObjectURL(comprimida.blob),
-        base64: comprimida.base64,
-      });
+      ponerFoto(comprimida.base64);
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo leer la foto.");
     }
@@ -96,6 +163,7 @@ export function Conversacion({
   async function enviar(mensaje: string) {
     setError(null);
     setFueraDeTema(null);
+    setAvisoRecuperado(false);
     setPensando(true);
 
     try {
@@ -131,28 +199,30 @@ export function Conversacion({
 
       if (datos.fueraDeTema) {
         setFueraDeTema(datos.mensaje);
-        setEstimacion((previa) =>
-          previa ? { ...previa, turnosRestantes: datos.turnosRestantes } : previa,
-        );
+        if (estimacion) {
+          actualizar({
+            estimacion: {
+              ...estimacion,
+              turnosRestantes: datos.turnosRestantes,
+            },
+          });
+        }
         return;
       }
 
-      setEstimacion({
-        sessionId: datos.sessionId,
+      actualizar({
+        estimacion: {
+          sessionId: datos.sessionId,
+          momento: datos.momento,
+          confianza: datos.confianza,
+          preguntas: datos.preguntas ?? [],
+          nota: datos.nota ?? "",
+          turnosRestantes: datos.turnosRestantes,
+        },
         momento: datos.momento,
-        confianza: datos.confianza,
-        preguntas: datos.preguntas ?? [],
-        nota: datos.nota ?? "",
-        turnosRestantes: datos.turnosRestantes,
+        items: (datos.items as ItemBorrador[]).map(conClave),
+        texto: "",
       });
-      setMomento(datos.momento);
-      setItems(
-        (datos.items as ItemBorrador[]).map((item, i) => ({
-          ...item,
-          clave: `${i}-${Date.now()}`,
-        })),
-      );
-      setTexto("");
     } catch {
       setError("No se pudo conectar. Revisá la señal e intentá de nuevo.");
     } finally {
@@ -180,25 +250,42 @@ export function Conversacion({
         setError(resultado.error);
         return;
       }
+      // Ya está en el diario: dejar el borrador lo convertiría en una copia
+      // que resucita la próxima vez que se abra Registrar.
+      limpiarBorrador();
       router.push("/hoy");
     });
   }
 
   function empezarDeNuevo() {
-    setEstimacion(null);
-    setItems([]);
-    setFoto(null);
-    setTexto("");
+    setEstado({
+      texto: "",
+      momento: momentoSugerido(new Date().getHours()),
+      estimacion: null,
+      items: [],
+    });
+    ponerFoto(null);
+    limpiarBorrador();
     setError(null);
     setFueraDeTema(null);
-    if (inputFoto.current) inputFoto.current.value = "";
+    setFotoNoGuardada(false);
+    setAvisoRecuperado(false);
   }
+
+  const avisoDeRecuperacion = avisoRecuperado ? (
+    <Aviso nivel="info">
+      Recuperamos lo que habías dejado sin guardar. Si no era esto, tocá
+      «Empezar de nuevo».
+    </Aviso>
+  ) : null;
 
   // ---------------------------------------------------------- entrada ---
 
   if (!estimacion) {
     return (
       <div className="space-y-4">
+        {avisoDeRecuperacion}
+
         {/*
           Sin `capture`: con ese atributo el celular abre la cámara directo y
           no deja llegar a la galería. Muchas comidas se fotografían en el
@@ -228,16 +315,16 @@ export function Conversacion({
             */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={foto.url}
+              // Una data: URL y no createObjectURL: el base64 es lo que
+              // sobrevive a que el sistema descarte la página, mientras que un
+              // blob URL muere con ella —y encima había que revocarlo a mano.
+              src={`data:image/jpeg;base64,${foto.base64}`}
               alt="Foto de la comida"
               className="max-h-[45vh] w-full object-contain"
             />
             <button
               type="button"
-              onClick={() => {
-                setFoto(null);
-                if (inputFoto.current) inputFoto.current.value = "";
-              }}
+              onClick={() => ponerFoto(null)}
               className="absolute top-2 right-2 rounded-full bg-ink/70 px-3 py-1.5 text-xs text-white"
             >
               Quitar
@@ -255,7 +342,7 @@ export function Conversacion({
         <div>
           <textarea
             value={texto}
-            onChange={(e) => setTexto(e.target.value)}
+            onChange={(e) => actualizar({ texto: e.target.value })}
             maxLength={LIMITES.caracteresPorMensaje}
             rows={3}
             placeholder="2 arepas de media tela con quesito y 3 huevos en mantequilla"
@@ -287,6 +374,8 @@ export function Conversacion({
 
   return (
     <div className="space-y-6">
+      {avisoDeRecuperacion}
+
       <div>
         <TituloSeccion>Estimación</TituloSeccion>
 
@@ -304,7 +393,7 @@ export function Conversacion({
           <EditorItems
             items={items}
             alimentos={alimentos}
-            onCambiar={setItems}
+            onCambiar={(nuevos) => actualizar({ items: nuevos })}
           />
 
           {items.length === 0 && (
@@ -346,7 +435,7 @@ export function Conversacion({
 
             <textarea
               value={texto}
-              onChange={(e) => setTexto(e.target.value)}
+              onChange={(e) => actualizar({ texto: e.target.value })}
               maxLength={LIMITES.caracteresPorMensaje}
               rows={2}
               placeholder="Dejé la mitad · era con mantequilla · el plato era compartido"
@@ -385,7 +474,9 @@ export function Conversacion({
           <select
             value={momento}
             onChange={(e) =>
-              setMomento(e.target.value as (typeof MOMENTOS)[number])
+              actualizar({
+                momento: e.target.value as (typeof MOMENTOS)[number],
+              })
             }
             className={claseControl}
           >
@@ -437,4 +528,9 @@ function aItemBorrador(item: ItemEditable): ItemBorrador {
     grasaG: item.grasaG,
     nota: item.nota,
   };
+}
+
+/** La clave de React se regenera al recuperar: no vale la pena guardarla. */
+function conClave(item: ItemBorrador, i: number): ItemEditable {
+  return { ...item, clave: `${i}-${crypto.randomUUID()}` };
 }

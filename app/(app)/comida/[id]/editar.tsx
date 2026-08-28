@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Aviso, Encabezado, Tarjeta, TituloSeccion, claseControl } from "@/components/ui";
+import { FotoAmpliable } from "@/components/foto-ampliable";
 import { EditorItems, type ItemEditable } from "@/components/editor-items";
 import {
   buscarAlimentos,
@@ -138,10 +139,10 @@ export function EditarComida({
               plato se juzga si 200 g de pollo eran 200 g, que es la corrección
               que más se hace y la que más mueve el número.
             */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+            <FotoAmpliable
               src={comida.fotoUrl}
               alt="La foto con la que se registró esta comida"
+              etiqueta="Ver la foto a pantalla completa"
               className="w-full rounded-2xl border border-hairline object-cover"
             />
           </div>

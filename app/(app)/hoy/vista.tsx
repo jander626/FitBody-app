@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Aviso, Tarjeta, TituloSeccion } from "@/components/ui";
+import { FotoAmpliable } from "@/components/foto-ampliable";
 import { NavegacionDia } from "@/components/navegacion-dia";
 import { Medidor, estadoMacro, type EstadoMedidor } from "@/components/medidor";
 import type { ComidaDiario, Dia } from "@/lib/datos/diario";
@@ -178,13 +179,13 @@ function TarjetaComida({ comida }: { comida: ComidaDiario }) {
     <Tarjeta>
       <div className="flex items-start gap-3">
         {comida.fotoUrl && (
-          // Chica y cuadrada: acá alcanza para reconocer el plato. La foto en
-          // grande va en la pantalla de corregir, que es donde hace falta
-          // mirarla para juzgar si la estimación fue razonable.
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
+          // Chica y cuadrada: acá alcanza para reconocer el plato. Tocarla la
+          // abre a pantalla completa, que es cuando de verdad se necesita
+          // mirarla — para juzgar si la porción estimada era la que había.
+          <FotoAmpliable
             src={comida.fotoUrl}
             alt=""
+            etiqueta={`Ver en grande la foto del ${(NOMBRE_MOMENTO[comida.momento] ?? comida.momento).toLowerCase()}`}
             loading="lazy"
             className="size-12 shrink-0 rounded-lg object-cover"
           />

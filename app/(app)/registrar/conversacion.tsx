@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Aviso, Tarjeta, TituloSeccion, claseControl } from "@/components/ui";
 import { EditorItems, type ItemEditable } from "@/components/editor-items";
 import { useHidratado } from "@/components/hidratado";
+import { FotoAmpliable } from "@/components/foto-ampliable";
 import type { Alimento } from "@/lib/alimentos";
 import { comprimirFoto } from "@/lib/foto";
 import { LIMITES } from "@/lib/guardrails/limites";
@@ -313,13 +314,13 @@ function Formulario({
               object-contain y no cover: recortar podría dejar fuera justo lo
               que se quiere comprobar que salió en la foto.
             */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+            <FotoAmpliable
               // Una data: URL y no createObjectURL: el base64 es lo que
               // sobrevive a que el sistema descarte la página, mientras que un
               // blob URL muere con ella —y encima había que revocarlo a mano.
               src={`data:image/jpeg;base64,${foto.base64}`}
               alt="Foto de la comida"
+              etiqueta="Ver la foto a pantalla completa"
               className="max-h-[45vh] w-full object-contain"
             />
             <button

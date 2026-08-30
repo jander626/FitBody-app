@@ -479,6 +479,7 @@ export interface Database {
           user_id: string;
           fecha: string;
           peso_kg: number;
+          cintura_cm: number | null;
           condiciones: string | null;
           nota: string | null;
           creado_en: string;
@@ -489,6 +490,7 @@ export interface Database {
           user_id: string;
           fecha: string;
           peso_kg: number;
+          cintura_cm?: number | null;
           condiciones?: string | null;
           nota?: string | null;
           creado_en?: string;
@@ -499,6 +501,7 @@ export interface Database {
           user_id?: string;
           fecha?: string;
           peso_kg?: number;
+          cintura_cm?: number | null;
           condiciones?: string | null;
           nota?: string | null;
           creado_en?: string;

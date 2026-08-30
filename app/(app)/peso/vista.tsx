@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState, useTransition } from "react";
+import Link from "next/link";
 import { Aviso, Campo, Encabezado, Tarjeta, TituloSeccion, claseControl } from "@/components/ui";
 import { GraficoPeso } from "@/components/grafico-peso";
 import type { EstadoPeso } from "@/lib/datos/peso";
@@ -18,7 +19,18 @@ export function VistaPeso({
     FormData
   >(guardarPeso, null);
 
-  const { serie, pesoDeHoy, pesoMetaKg, ajuste, ritmoEsperadoKgSemana } = estado;
+  const {
+    serie,
+    pesoDeHoy,
+    pesoMetaKg,
+    ajuste,
+    ritmoEsperadoKgSemana,
+    cintura,
+    cinturaDeHoy,
+    composicion,
+  } = estado;
+
+  const ultimaCintura = cintura.at(-1);
 
   const ultimo = serie.at(-1);
   // La media móvil más reciente que exista. Los primeros días no tienen, así
@@ -69,6 +81,40 @@ export function VistaPeso({
               />
             </Campo>
 
+            {/*
+              Vacío por defecto y nunca prellenado con la medida anterior: un
+              número que ya está ahí invita a guardarlo sin medir, y una medida
+              inventada contamina la lectura durante semanas. El peso sí se
+              prellena porque cambia poco; la cintura, si no la mediste hoy,
+              mejor que quede vacía.
+            */}
+            <Campo
+              etiqueta={
+                cinturaDeHoy !== null
+                  ? "Cintura (ya registrada hoy)"
+                  : "Cintura, en cm — opcional"
+              }
+              ayuda={
+                cinturaDeHoy !== null
+                  ? "Dejala vacía si solo venís a corregir el peso: no se borra."
+                  : "Una vez por semana alcanza. En ayunas, de pie, a la altura del ombligo, después de soltar el aire y sin meter la panza."
+              }
+            >
+              <input
+                name="cinturaCm"
+                type="number"
+                min={40}
+                max={250}
+                step={0.1}
+                inputMode="decimal"
+                placeholder={
+                  ultimaCintura ? `la última fue ${ultimaCintura.cinturaCm}` : "94.5"
+                }
+                defaultValue={cinturaDeHoy ?? ""}
+                className={claseControl}
+              />
+            </Campo>
+
             <button
               type="submit"
               disabled={guardando}
@@ -103,6 +149,11 @@ export function VistaPeso({
           </div>
         )}
 
+        <div>
+          <TituloSeccion>Cintura</TituloSeccion>
+          <TarjetaComposicion composicion={composicion} medidas={cintura} />
+        </div>
+
         {ajuste && (
           <div>
             <TituloSeccion>Ajuste semanal</TituloSeccion>
@@ -112,9 +163,80 @@ export function VistaPeso({
             />
           </div>
         )}
+
+        {/* La importación del reloj vivía solo detrás de un enlace en
+            Historial y no se encontraba. Va acá porque es parte de la misma
+            rutina semanal: pesarse, medirse y traer el gasto del reloj. */}
+        <div>
+          <TituloSeccion>Gasto del reloj</TituloSeccion>
+          <Tarjeta>
+            <p className="text-sm text-ink-2">
+              Importá el CSV de Garmin Connect y el déficit de cada día se
+              calcula contra el gasto que midió el reloj, no contra la fórmula.
+            </p>
+            <Link
+              href="/garmin"
+              className="mt-3 block rounded-xl border border-hairline px-4 py-2.5 text-center text-sm text-ink-2"
+            >
+              Importar desde Garmin
+            </Link>
+          </Tarjeta>
+        </div>
       </div>
     </>
   );
+}
+
+/**
+ * Lo que dicen la cintura y el peso juntos.
+ *
+ * Sin color de "bien" o "mal": la misma lectura es buena o mala según lo que
+ * estés buscando —subir de peso sin ensanchar es excelente para quien gana
+ * músculo y alarmante para quien baja grasa—. La app describe; el juicio es
+ * de quien lee.
+ */
+function TarjetaComposicion({
+  composicion,
+  medidas,
+}: {
+  composicion: EstadoPeso["composicion"];
+  medidas: EstadoPeso["cintura"];
+}) {
+  const { titulo, detalle, deltaCinturaCm, deltaPesoKg, dias } = composicion;
+
+  return (
+    <Tarjeta>
+      <p className="font-medium text-ink">{titulo}</p>
+      <p className="mt-1.5 text-sm text-ink-2">{detalle}</p>
+
+      {deltaCinturaCm !== null && (
+        <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 border-t border-hairline-soft pt-3 font-mono text-xs text-muted tabular-nums">
+          <span>
+            cintura {conSigno(deltaCinturaCm)} cm
+            {dias !== null && ` en ${dias} d`}
+          </span>
+          {deltaPesoKg !== null && <span>peso {conSigno(deltaPesoKg)} kg</span>}
+        </div>
+      )}
+
+      {medidas.length > 1 && (
+        <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
+          {/* Las últimas seis, de la más vieja a la más nueva: la serie cruda
+              al lado de la interpretación, para poder desconfiar de ella. */}
+          {medidas.slice(-6).map((m) => (
+            <li key={m.fecha} className="font-mono tabular-nums">
+              {m.fecha.slice(5)} · {m.cinturaCm}
+            </li>
+          ))}
+        </ul>
+      )}
+    </Tarjeta>
+  );
+}
+
+/** Un "+" explícito: sin él, −2 y 2 se leen distinto de un vistazo. */
+function conSigno(n: number): string {
+  return `${n > 0 ? "+" : n < 0 ? "−" : "±"}${Math.abs(n).toFixed(1)}`;
 }
 
 function TarjetaAjuste({

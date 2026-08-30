@@ -13,6 +13,16 @@ const PesoSchema = z.object({
   pesoKg: z.coerce.number().min(20).max(400),
   fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   condiciones: z.string().max(200).optional(),
+  // Vacío es lo normal: el peso se toma todos los días y la cintura una vez
+  // por semana. `""` no se puede pasar por coerce.number() —daría 0— así que
+  // se limpia antes de convertir.
+  cinturaCm: z
+    .string()
+    .optional()
+    .transform((v) => (v && v.trim() !== "" ? Number(v) : null))
+    .refine((v) => v === null || (v >= 40 && v <= 250), {
+      message: "la cintura tiene que estar entre 40 y 250 cm",
+    }),
 });
 
 /** Guarda el peso del día. Un segundo pesaje corrige al primero, no se suma. */
@@ -35,18 +45,23 @@ export async function guardarPeso(
     if (!analisis.success) {
       return {
         ok: false,
-        error: `Revisá el peso: ${analisis.error.issues[0].message}`,
+        error: `Revisá los datos: ${analisis.error.issues[0].message}`,
       };
     }
 
-    const { pesoKg, fecha, condiciones } = analisis.data;
+    const { pesoKg, fecha, condiciones, cinturaCm } = analisis.data;
 
+    // La cintura solo se escribe cuando vino un número: corregir el peso de un
+    // domingo dejando el campo vacío no puede borrar la medida de ese día.
+    // Omitir la clave —en vez de mandar null— es lo que hace que el upsert la
+    // deje como estaba.
     const { error } = await supabase.from("weight_logs").upsert(
       {
         user_id: user.id,
         fecha,
         peso_kg: pesoKg,
         condiciones: condiciones?.trim() || null,
+        ...(cinturaCm !== null && { cintura_cm: cinturaCm }),
       },
       { onConflict: "user_id,fecha" },
     );
@@ -56,7 +71,13 @@ export async function guardarPeso(
     revalidatePath("/peso");
     revalidatePath("/perfil");
     revalidatePath("/historial");
-    return { ok: true, mensaje: `Peso de hoy: ${pesoKg} kg.` };
+    return {
+      ok: true,
+      mensaje:
+        cinturaCm !== null
+          ? `Guardado: ${pesoKg} kg y ${cinturaCm} cm de cintura.`
+          : `Peso de hoy: ${pesoKg} kg.`,
+    };
   } catch (err) {
     return {
       ok: false,

@@ -1,6 +1,8 @@
 "use client";
 
-import { macrosDePorcion, type Alimento } from "@/lib/alimentos";
+import { useState } from "react";
+import type { Alimento } from "@/lib/alimentos";
+import { recalcularPorcion } from "@/lib/registro/porcion";
 import type { ItemBorrador } from "@/lib/registro/tipos";
 
 /** Un ítem del borrador con la clave que necesita React. */
@@ -12,10 +14,9 @@ export interface ItemEditable extends ItemBorrador {
  * La tarjeta editable de ítems.
  *
  * Es la misma venga del buscador manual o de la estimación de la IA — corregir
- * no es una excepción del flujo, es el flujo. Cuando el ítem está enlazado a
- * la tabla, mover la porción recalcula los macros desde ahí; cuando es texto
- * libre, se escala proporcionalmente sobre lo que estimó el modelo, que es lo
- * mejor disponible.
+ * no es una excepción del flujo, es el flujo. La cuenta de qué pasa con los
+ * macros al mover una porción vive en `lib/registro/porcion`, que es puro y
+ * está testeado; acá solo queda la pantalla.
  */
 export function EditorItems({
   items,
@@ -30,35 +31,15 @@ export function EditorItems({
 
   function cambiarPorcion(clave: string, nueva: number) {
     onCambiar(
-      items.map((item) => {
-        if (item.clave !== clave) return item;
-
-        const enTabla = item.foodId ? porId.get(item.foodId) : undefined;
-        if (enTabla) {
-          return {
-            ...item,
-            porcionG: nueva,
-            ...macrosDePorcion(enTabla, nueva),
-          };
-        }
-
-        // Texto libre: se escala sobre la estimación original. Sin porción
-        // previa no hay proporción que aplicar, así que solo se anota.
-        const anterior = item.porcionG ?? item.porcionMl;
-        if (!anterior || anterior <= 0) {
-          return { ...item, porcionG: nueva };
-        }
-        const factor = nueva / anterior;
-        const campo = item.porcionMl !== null ? "porcionMl" : "porcionG";
-        return {
-          ...item,
-          [campo]: nueva,
-          kcal: Math.round(item.kcal * factor * 10) / 10,
-          proteinaG: Math.round(item.proteinaG * factor * 10) / 10,
-          carbsG: Math.round(item.carbsG * factor * 10) / 10,
-          grasaG: Math.round(item.grasaG * factor * 10) / 10,
-        };
-      }),
+      items.map((item) =>
+        item.clave === clave
+          ? recalcularPorcion(
+              item,
+              nueva,
+              item.foodId ? porId.get(item.foodId) : undefined,
+            )
+          : item,
+      ),
     );
   }
 
@@ -89,18 +70,10 @@ export function EditorItems({
             <div className="mt-1.5 flex items-center gap-2">
               {porcion !== null ? (
                 <>
-                  <input
-                    type="number"
-                    min={1}
-                    max={5000}
-                    step={5}
-                    inputMode="numeric"
-                    value={porcion}
-                    onChange={(e) =>
-                      cambiarPorcion(item.clave, Number(e.target.value) || 0)
-                    }
-                    aria-label={`Porción de ${item.alimento} en ${unidad}`}
-                    className="w-24 rounded-lg border border-hairline bg-surface px-2.5 py-1.5 text-sm text-ink tabular-nums outline-none focus:border-accent"
+                  <CampoPorcion
+                    valor={porcion}
+                    etiqueta={`Porción de ${item.alimento} en ${unidad}`}
+                    onCambiar={(n) => cambiarPorcion(item.clave, n)}
                   />
                   <span className="text-xs text-muted">{unidad}</span>
                 </>
@@ -119,5 +92,58 @@ export function EditorItems({
         );
       })}
     </div>
+  );
+}
+
+/**
+ * El número de la porción.
+ *
+ * Guarda lo que estás escribiendo como texto y no como número, que suena a
+ * detalle y no lo es: con `value={numero}`, borrar el campo daba 0, el 0
+ * quedaba escrito, y al teclear encima salía "030" —y una porción de cero
+ * ponía los macros en cero de paso—. Con texto, el campo vacío es simplemente
+ * "todavía no hay número": no se avisa a nadie hasta que lo haya.
+ */
+function CampoPorcion({
+  valor,
+  etiqueta,
+  onCambiar,
+}: {
+  valor: number;
+  etiqueta: string;
+  onCambiar: (n: number) => void;
+}) {
+  const [texto, setTexto] = useState(() => String(valor));
+  const [valorVisto, setValorVisto] = useState(valor);
+
+  // Cuando el valor cambia desde afuera —al recuperar un borrador, o al
+  // recalcular— el texto se pone al día. Es el patrón que React recomienda
+  // para ajustar estado ante un cambio de props: durante el render, no en un
+  // efecto, para que no haya un pintado intermedio con el número viejo.
+  if (valor !== valorVisto) {
+    setValorVisto(valor);
+    setTexto(String(valor));
+  }
+
+  return (
+    <input
+      type="number"
+      min={1}
+      max={5000}
+      step={5}
+      inputMode="numeric"
+      value={texto}
+      onChange={(e) => {
+        const crudo = e.target.value;
+        setTexto(crudo);
+        const n = Number(crudo);
+        // Un campo vacío o un cero es "todavía no": no se avisa. Así se puede
+        // borrar y volver a escribir sin que los macros pasen por cero.
+        if (crudo.trim() !== "" && Number.isFinite(n) && n > 0) onCambiar(n);
+      }}
+      onBlur={() => setTexto(String(valor))}
+      aria-label={etiqueta}
+      className="w-24 rounded-lg border border-hairline bg-surface px-2.5 py-1.5 text-sm text-ink tabular-nums outline-none focus:border-accent"
+    />
   );
 }

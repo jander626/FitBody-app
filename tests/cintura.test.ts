@@ -9,8 +9,10 @@
 import { describe, expect, it } from "vitest";
 import {
   DIAS_MINIMOS,
+  RATIO_UMBRAL,
   RUIDO_CINTURA_CM,
   leerComposicion,
+  ratioCinturaEstatura,
   type MedidaCintura,
 } from "@/lib/nutrition/cintura";
 import { mediaMovil7d } from "@/lib/nutrition";
@@ -167,6 +169,43 @@ describe("sin tendencia de peso", () => {
       serie,
     );
     expect(r.deltaPesoKg).toBeNull();
+  });
+});
+
+describe("ratio cintura/estatura", () => {
+  // Los números son los de la bitácora real: 170 cm de estatura, 95 cm de
+  // cintura en la línea base y 93 en la remedición del día 12.
+  it("reproduce los ratios que ya estaban calculados a mano", () => {
+    expect(ratioCinturaEstatura(95, 170)!.ratio).toBe(0.559);
+    expect(ratioCinturaEstatura(93, 170)!.ratio).toBe(0.547);
+  });
+
+  it("dice cuántos cm faltan para 0.50", () => {
+    // A 170 cm, el umbral son 85 cm exactos — la meta que el plan ya fijaba.
+    const r = ratioCinturaEstatura(93, 170)!;
+    expect(r.cmParaUmbral).toBe(8);
+    expect(r.bajoUmbral).toBe(false);
+  });
+
+  it("justo en el umbral cuenta como estar debajo", () => {
+    const r = ratioCinturaEstatura(85, 170)!;
+    expect(r.ratio).toBe(RATIO_UMBRAL);
+    expect(r.bajoUmbral).toBe(true);
+    expect(r.cmParaUmbral).toBe(0);
+  });
+
+  it("por debajo no reporta cm negativos que faltan", () => {
+    const r = ratioCinturaEstatura(80, 170)!;
+    expect(r.bajoUmbral).toBe(true);
+    expect(r.cmParaUmbral).toBe(0);
+  });
+
+  it("sin estatura no inventa un ratio", () => {
+    // Pasa con un perfil a medio llenar. Un ratio contra una estatura
+    // supuesta se vería igual de creíble y estaría mal.
+    expect(ratioCinturaEstatura(93, null)).toBeNull();
+    expect(ratioCinturaEstatura(93, undefined)).toBeNull();
+    expect(ratioCinturaEstatura(93, 0)).toBeNull();
   });
 });
 

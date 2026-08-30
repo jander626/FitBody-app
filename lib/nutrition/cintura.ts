@@ -187,6 +187,37 @@ export function leerComposicion(
   return { ...base, lectura: "estable", titulo: `Sin cambios ${enSemanas}`, detalle: `Cintura y peso se movieron menos de lo que se puede medir con confianza. Si el objetivo era mantener, esto es exactamente lo buscado; si era bajar, todavía no hay señal.` };
 }
 
+/**
+ * Umbral del ratio cintura/estatura.
+ *
+ * Por encima de 0.50 se asocia con más riesgo cardiometabólico. Es una regla
+ * gruesa —"la cintura, menos de la mitad de la estatura"— y por eso sirve:
+ * no necesita báscula de bioimpedancia ni fórmula, solo una cinta métrica, y
+ * distingue mejor que el IMC, que no sabe separar músculo de grasa.
+ */
+export const RATIO_UMBRAL = 0.5;
+
+export interface RatioCintura {
+  ratio: number;
+  /** Cuántos cm de cintura faltan para llegar al umbral. 0 si ya está. */
+  cmParaUmbral: number;
+  bajoUmbral: boolean;
+}
+
+export function ratioCinturaEstatura(
+  cinturaCm: number,
+  estaturaCm: number | null | undefined,
+): RatioCintura | null {
+  if (!estaturaCm || estaturaCm <= 0) return null;
+  const ratio = cinturaCm / estaturaCm;
+  const objetivo = estaturaCm * RATIO_UMBRAL;
+  return {
+    ratio: Math.round(ratio * 1000) / 1000,
+    cmParaUmbral: Math.max(0, Math.round((cinturaCm - objetivo) * 10) / 10),
+    bajoUmbral: ratio <= RATIO_UMBRAL,
+  };
+}
+
 function direccion(delta: number, ruido: number): "baja" | "sube" | "igual" {
   if (delta <= -ruido) return "baja";
   if (delta >= ruido) return "sube";

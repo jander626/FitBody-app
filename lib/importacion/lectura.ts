@@ -90,6 +90,20 @@ interface PesosArchivo {
   }[];
 }
 
+/**
+ * `data/medidas.json`: cintura, cuello y derivados, semanal.
+ *
+ * Solo se trae la cintura. El cuello y el % de grasa US Navy están en la
+ * bitácora pero la app todavía no los usa, y traer un dato que nadie lee es
+ * inventar una columna que después hay que mantener.
+ */
+interface MedidasArchivo {
+  registros: {
+    fecha: string;
+    cintura?: number | null;
+  }[];
+}
+
 // ------------------------------------------------------- filas de salida ---
 
 export interface FilaFood {
@@ -127,6 +141,14 @@ export interface FilaPeso {
   peso_kg: number;
   condiciones: string | null;
   nota: string | null;
+  /**
+   * Cintura de ese día, cuando se midió.
+   *
+   * Va acá y no en una lista aparte porque en la base viven en la misma fila:
+   * peso y cintura son la misma medición de la misma mañana. Null en los días
+   * que solo hubo pesaje, que son la mayoría.
+   */
+  cintura_cm: number | null;
 }
 
 export interface FilaItem {
@@ -172,6 +194,8 @@ export interface Bitacora {
   dias: FilaDia[];
   /** Días sin `dia_plan`, es decir el pre-plan que se descarta. */
   diasSalteados: number;
+  /** Fechas con cintura pero sin pesaje: no se pueden guardar. */
+  cinturasHuerfanas: string[];
 }
 
 // ------------------------------------------------------------- lectura ---
@@ -240,14 +264,36 @@ export async function leerBitacora(repo: string): Promise<Bitacora> {
     grasa_g: p.calculado.grasa_g,
   };
 
-  // --- pesos ---
+  // --- pesos y medidas ---
   const pesosArchivo = await leerJson<PesosArchivo>(repo, "data", "peso.json");
+
+  // medidas.json es opcional: una bitácora sin él sigue importándose.
+  let cinturaPorFecha = new Map<string, number>();
+  try {
+    const medidas = await leerJson<MedidasArchivo>(repo, "data", "medidas.json");
+    cinturaPorFecha = new Map(
+      medidas.registros
+        .filter((r) => typeof r.cintura === "number")
+        .map((r) => [r.fecha, r.cintura as number]),
+    );
+  } catch {
+    // Sin archivo de medidas no hay cinturas que traer, y ya está.
+  }
+
   const pesos: FilaPeso[] = pesosArchivo.registros.map((r) => ({
     fecha: r.fecha,
     peso_kg: r.kg,
     condiciones: r.condiciones ?? null,
     nota: r.nota ?? null,
+    cintura_cm: cinturaPorFecha.get(r.fecha) ?? null,
   }));
+
+  // Una medida de cintura en un día sin pesaje no tendría fila donde vivir.
+  // Es raro —se miden juntos— pero pasar por alto un dato en silencio es peor
+  // que decirlo, sobre todo cuando la serie de cintura tiene cinco puntos.
+  const cinturasHuerfanas = [...cinturaPorFecha.keys()].filter(
+    (f) => !pesosArchivo.registros.some((r) => r.fecha === f),
+  );
 
   // --- comidas ---
   const dirComidas = path.join(repo, "data", "comidas");
@@ -301,5 +347,5 @@ export async function leerBitacora(repo: string): Promise<Bitacora> {
     });
   }
 
-  return { foods, perfil, objetivo, pesos, dias, diasSalteados };
+  return { foods, perfil, objetivo, pesos, dias, diasSalteados, cinturasHuerfanas };
 }

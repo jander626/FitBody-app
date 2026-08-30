@@ -4,6 +4,7 @@ import {
   ajusteSemanal,
   leerComposicion,
   mediaMovil7d,
+  ratioCinturaEstatura,
   ritmoEsperado,
   tdee,
   tmb,
@@ -11,6 +12,7 @@ import {
   type LecturaComposicion,
   type MedidaCintura,
   type PuntoTendencia,
+  type RatioCintura,
   type Sexo,
 } from "@/lib/nutrition";
 import { clienteServidor } from "@/lib/supabase/cliente-servidor";
@@ -35,6 +37,11 @@ export interface EstadoPeso {
    * igual haya plan o no.
    */
   composicion: LecturaComposicion;
+  /**
+   * Cintura sobre estatura, de la última medida. Null sin estatura o sin
+   * medidas. Es la métrica que el plan de 90 días persigue: 0.50.
+   */
+  ratio: RatioCintura | null;
 }
 
 /** Todo lo que necesita la pantalla de peso, en una pasada. */
@@ -77,6 +84,11 @@ export async function obtenerEstadoPeso(
   const cinturaDeHoy =
     cintura.find((m) => m.fecha === hoy)?.cinturaCm ?? null;
   const composicion = leerComposicion(cintura, serie);
+
+  const ultimaCintura = cintura.at(-1);
+  const ratio = ultimaCintura
+    ? ratioCinturaEstatura(ultimaCintura.cinturaCm, perfilRes.data?.estatura_cm)
+    : null;
   const ultimoPeso = registros.at(-1)?.pesoKg ?? null;
 
   const objetivo = objetivoRes.data;
@@ -103,6 +115,7 @@ export async function obtenerEstadoPeso(
       cintura,
       cinturaDeHoy,
       composicion,
+      ratio,
     };
   }
 
@@ -129,5 +142,6 @@ export async function obtenerEstadoPeso(
     cintura,
     cinturaDeHoy,
     composicion,
+    ratio,
   };
 }

@@ -28,6 +28,7 @@ export function VistaPeso({
     cintura,
     cinturaDeHoy,
     composicion,
+    ratio,
   } = estado;
 
   const ultimaCintura = cintura.at(-1);
@@ -151,7 +152,11 @@ export function VistaPeso({
 
         <div>
           <TituloSeccion>Cintura</TituloSeccion>
-          <TarjetaComposicion composicion={composicion} medidas={cintura} />
+          <TarjetaComposicion
+            composicion={composicion}
+            medidas={cintura}
+            ratio={ratio}
+          />
         </div>
 
         {ajuste && (
@@ -198,9 +203,11 @@ export function VistaPeso({
 function TarjetaComposicion({
   composicion,
   medidas,
+  ratio,
 }: {
   composicion: EstadoPeso["composicion"];
   medidas: EstadoPeso["cintura"];
+  ratio: EstadoPeso["ratio"];
 }) {
   const { titulo, detalle, deltaCinturaCm, deltaPesoKg, dias } = composicion;
 
@@ -208,6 +215,21 @@ function TarjetaComposicion({
     <Tarjeta>
       <p className="font-medium text-ink">{titulo}</p>
       <p className="mt-1.5 text-sm text-ink-2">{detalle}</p>
+
+      {ratio && (
+        // Cintura sobre estatura: la regla es "menos de la mitad". Distingue
+        // mejor que el IMC, que con 61 kg de masa magra da "sobrepeso" y no
+        // significa nada.
+        <p className="mt-2.5 text-sm text-ink-2">
+          Cintura sobre estatura:{" "}
+          <span className="font-mono tabular-nums">
+            {ratio.ratio.toFixed(3)}
+          </span>
+          {ratio.bajoUmbral
+            ? " — por debajo de 0.50, que es el umbral."
+            : ` — faltan ${ratio.cmParaUmbral.toFixed(1)} cm para bajar de 0.50.`}
+        </p>
+      )}
 
       {deltaCinturaCm !== null && (
         <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 border-t border-hairline-soft pt-3 font-mono text-xs text-muted tabular-nums">

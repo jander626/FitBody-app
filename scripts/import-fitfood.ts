@@ -115,7 +115,16 @@ async function main() {
     { onConflict: "user_id,fecha" },
   );
   if (errPeso) throw errPeso;
-  console.log(`  ✓ ${bitacora.pesos.length} pesajes`);
+  const conCintura = bitacora.pesos.filter((p) => p.cintura_cm !== null).length;
+  console.log(
+    `  ✓ ${bitacora.pesos.length} pesajes` +
+      (conCintura > 0 ? `, ${conCintura} con medida de cintura` : ""),
+  );
+  for (const fecha of bitacora.cinturasHuerfanas) {
+    console.warn(
+      `  ! cintura del ${fecha} sin pesaje ese día: no se pudo guardar`,
+    );
+  }
 
   // --- comidas ---
   let items = 0;

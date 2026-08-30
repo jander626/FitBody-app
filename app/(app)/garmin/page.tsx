@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { Encabezado, Tarjeta, TituloSeccion } from "@/components/ui";
 import { clienteServidor } from "@/lib/supabase/cliente-servidor";
 import { obtenerMetricas } from "@/lib/datos/metricas";
+import { fechaDeHoy } from "@/lib/datos/diario";
+import { CaloriasAMano } from "./calorias-a-mano";
 import { SubirGarmin } from "./subir";
 
 export default async function PaginaGarmin() {
@@ -12,8 +14,15 @@ export default async function PaginaGarmin() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const metricas = await obtenerMetricas(user.id);
+  const [metricas, hoy] = await Promise.all([
+    obtenerMetricas(user.id),
+    fechaDeHoy(),
+  ]);
   const conCalorias = metricas.filter((m) => m.kcalTotales !== null).length;
+
+  const kcalPorFecha = Object.fromEntries(
+    metricas.map((m) => [m.fecha, m.kcalTotales]),
+  );
 
   return (
     <>
@@ -28,6 +37,11 @@ export default async function PaginaGarmin() {
 
       <div className="space-y-6 px-5">
         <SubirGarmin />
+
+        <div>
+          <TituloSeccion>Calorías a mano</TituloSeccion>
+          <CaloriasAMano hoy={hoy} guardadas={kcalPorFecha} />
+        </div>
 
         <div>
           <TituloSeccion>Cómo exportar desde Garmin</TituloSeccion>
@@ -48,7 +62,9 @@ export default async function PaginaGarmin() {
             <p className="text-xs text-muted">
               El de <strong>Calorías</strong> es el que importa para el gasto
               real: los de pasos y sueño no traen calorías. Sin él, el gasto se
-              sigue estimando con tu peso, estatura y edad.
+              sigue estimando con tu peso, estatura y edad. Si ese informe no
+              te ofrece exportar CSV, escribí los totales a mano acá arriba —
+              son siete números por semana.
             </p>
           </Tarjeta>
         </div>

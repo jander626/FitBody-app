@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Encabezado } from "@/components/ui";
 import type { Alimento } from "@/lib/alimentos";
+import type { Totales } from "@/lib/registro/tipos";
 import { Conversacion } from "./conversacion";
 import { RegistroManual } from "./manual";
 
@@ -12,10 +13,14 @@ export function VistaRegistrar({
   alimentos,
   fecha,
   userId,
+  objetivo,
+  consumido,
 }: {
   alimentos: Alimento[];
   fecha: string;
   userId: string;
+  objetivo: Totales | null;
+  consumido: Totales;
 }) {
   const [modo, setModo] = useState<Modo>("asistido");
 
@@ -71,10 +76,21 @@ export function VistaRegistrar({
           arregla entero, sin guardar nada en ninguna parte.
         */}
         <div className={modo === "asistido" ? undefined : "hidden"}>
-          <Conversacion alimentos={alimentos} fecha={fecha} userId={userId} />
+          <Conversacion
+            alimentos={alimentos}
+            fecha={fecha}
+            userId={userId}
+            objetivo={objetivo}
+            consumido={consumido}
+          />
         </div>
         <div className={modo === "manual" ? undefined : "hidden"}>
-          <RegistroManual alimentos={alimentos} fecha={fecha} />
+          <RegistroManual
+            alimentos={alimentos}
+            fecha={fecha}
+            objetivo={objetivo}
+            consumido={consumido}
+          />
         </div>
       </div>
     </>

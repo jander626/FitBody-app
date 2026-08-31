@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Aviso, Tarjeta, TituloSeccion, claseControl } from "@/components/ui";
 import { EditorItems, type ItemEditable } from "@/components/editor-items";
+import { SenalesComida } from "@/components/senales-comida";
 import {
   buscarAlimentos,
   macrosDePorcion,
@@ -15,6 +16,7 @@ import {
   NOMBRE_MOMENTO,
   momentoSugerido,
   totalesDeItems,
+  type Totales,
   type ItemBorrador,
 } from "@/lib/registro/tipos";
 import { guardarComida } from "./acciones";
@@ -22,9 +24,13 @@ import { guardarComida } from "./acciones";
 export function RegistroManual({
   alimentos,
   fecha,
+  objetivo,
+  consumido,
 }: {
   alimentos: Alimento[];
   fecha: string;
+  objetivo: Totales | null;
+  consumido: Totales;
 }) {
   const router = useRouter();
   const [consulta, setConsulta] = useState("");
@@ -85,6 +91,13 @@ export function RegistroManual({
 
   return (
     <div className="space-y-6">
+      {items.length > 0 && (
+        <SenalesComida
+          comida={totales}
+          contexto={{ objetivo, consumido, momento }}
+        />
+      )}
+
       {items.length > 0 && (
         <div>
           <TituloSeccion>Por guardar</TituloSeccion>

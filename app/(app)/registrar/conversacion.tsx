@@ -6,6 +6,7 @@ import { Aviso, Tarjeta, TituloSeccion, claseControl } from "@/components/ui";
 import { EditorItems, type ItemEditable } from "@/components/editor-items";
 import { useHidratado } from "@/components/hidratado";
 import { FotoAmpliable } from "@/components/foto-ampliable";
+import { SenalesComida } from "@/components/senales-comida";
 import type { Alimento } from "@/lib/alimentos";
 import { comprimirFoto } from "@/lib/foto";
 import { LIMITES } from "@/lib/guardrails/limites";
@@ -15,6 +16,7 @@ import {
   momentoSugerido,
   totalesDeItems,
   type ItemBorrador,
+  type Totales,
 } from "@/lib/registro/tipos";
 import {
   guardarBorrador,
@@ -41,11 +43,15 @@ interface EstadoBorrador {
   items: ItemEditable[];
 }
 
-export function Conversacion(props: {
+export interface PropsRegistro {
   alimentos: Alimento[];
   fecha: string;
   userId: string;
-}) {
+  objetivo: Totales | null;
+  consumido: Totales;
+}
+
+export function Conversacion(props: PropsRegistro) {
   // El borrador vive en localStorage, que en el servidor no existe. Montar el
   // formulario recién después de hidratar evita que el servidor pinte uno
   // vacío y el cliente uno con lo recuperado: para React eso es HTML que no
@@ -70,11 +76,9 @@ function Formulario({
   alimentos,
   fecha,
   userId,
-}: {
-  alimentos: Alimento[];
-  fecha: string;
-  userId: string;
-}) {
+  objetivo,
+  consumido,
+}: PropsRegistro) {
   const router = useRouter();
   const inputFoto = useRef<HTMLInputElement>(null);
 
@@ -421,6 +425,11 @@ function Formulario({
           </p>
         </Tarjeta>
       </div>
+
+      <SenalesComida
+        comida={totales}
+        contexto={{ objetivo, consumido, momento }}
+      />
 
       {estimacion.preguntas.length > 0 && !sinTurnos && (
         <div>

@@ -54,8 +54,22 @@ export const ComidaBorradorSchema = z.object({
 
 export type ComidaBorrador = z.infer<typeof ComidaBorradorSchema>;
 
+/**
+ * Calorías y macros de un conjunto de ítems.
+ *
+ * Vive acá, en el módulo puro, y no en `lib/datos/diario` —que es server-only—
+ * porque lo necesitan también las señales del registro, que corren en el
+ * navegador. Una sola definición: el diario la reexporta.
+ */
+export interface Totales {
+  kcal: number;
+  proteinaG: number;
+  carbsG: number;
+  grasaG: number;
+}
+
 /** Suma de los ítems. La misma cuenta en el borrador y en el diario. */
-export function totalesDeItems(items: ItemBorrador[]) {
+export function totalesDeItems(items: ItemBorrador[]): Totales {
   return items.reduce(
     (acc, i) => ({
       kcal: acc.kcal + i.kcal,

@@ -3,6 +3,7 @@ import "server-only";
 import { cookies } from "next/headers";
 import { clienteServidor } from "@/lib/supabase/cliente-servidor";
 import { COOKIE_ZONA, fechaEnZona, zonaSegura } from "@/lib/zona";
+import type { Totales } from "@/lib/registro/tipos";
 import { urlsDeFotos } from "./fotos";
 
 export interface ItemDiario {
@@ -46,12 +47,7 @@ export interface ComidaDiario {
   subtotal: Totales;
 }
 
-export interface Totales {
-  kcal: number;
-  proteinaG: number;
-  carbsG: number;
-  grasaG: number;
-}
+export type { Totales } from "@/lib/registro/tipos";
 
 export interface Dia {
   fecha: string;

@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { Aviso, Tarjeta, TituloSeccion } from "@/components/ui";
 import { FotoAmpliable } from "@/components/foto-ampliable";
+import { TarjetaConsejo } from "@/components/tarjeta-consejo";
 import { NavegacionDia } from "@/components/navegacion-dia";
 import { Medidor, estadoMacro, type EstadoMedidor } from "@/components/medidor";
 import type { ComidaDiario, Dia } from "@/lib/datos/diario";
+import type { Consejo } from "@/lib/coach/consejos";
 
 const NOMBRE_MOMENTO: Record<string, string> = {
   desayuno: "Desayuno",
@@ -38,10 +40,13 @@ export function VistaHoy({
   dia,
   esHoy,
   hoy,
+  consejo,
 }: {
   dia: Dia;
   esHoy: boolean;
   hoy: string;
+  /** El más urgente de la semana. Null en días pasados. */
+  consejo: Consejo | null;
 }) {
   const { totales, objetivo, comidas } = dia;
 
@@ -140,6 +145,22 @@ export function VistaHoy({
               La proteína se persigue hacia arriba; el resto son techos.
             </p>
           </Tarjeta>
+        )}
+
+        {consejo && (
+          <div>
+            {/* Solo el más urgente. Los demás están en /consejos: una lista
+                larga en la pantalla que se abre cuatro veces al día deja de
+                leerse a los tres días. */}
+            <TituloSeccion>Lo que dicen tus datos</TituloSeccion>
+            <TarjetaConsejo consejo={consejo} />
+            <Link
+              href="/consejos"
+              className="mt-2 block py-2 text-center text-sm text-muted"
+            >
+              Ver todos los consejos
+            </Link>
+          </div>
         )}
 
         <div>

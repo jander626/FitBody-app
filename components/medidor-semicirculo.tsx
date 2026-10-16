@@ -1,9 +1,14 @@
+"use client";
+
+import { useCuenta } from "./movimiento";
+
 /**
  * Medidor de arco para un objetivo con margen.
  *
- * Muestra un número central y, debajo, el rango en que el día cuenta como
- * bueno. Es decorativo en el sentido de que el dato completo va escrito al
- * lado: el arco acompaña, no es la única forma de leer el número.
+ * Muestra un número central que sube hasta su valor, y debajo el rango en que
+ * el día cuenta como bueno. El arco se dibuja de izquierda a derecha al
+ * aparecer. El dato completo va escrito: el arco acompaña, no es la única
+ * forma de leer el número.
  */
 export function MedidorSemicirculo({
   valor,
@@ -16,8 +21,9 @@ export function MedidorSemicirculo({
   min: number;
   max: number;
 }) {
-  // Semicírculo de radio 90 centrado en (100, 100); se recorre de izquierda a
-  // derecha. `t` va de 0 a 1.
+  const animado = useCuenta(valor, 1100);
+
+  // Semicírculo de radio 90 centrado en (100, 100); `t` va de 0 a 1.
   const punto = (t: number) => {
     const ang = Math.PI * (1 - t);
     return { x: 100 + 90 * Math.cos(ang), y: 100 - 90 * Math.sin(ang) };
@@ -28,7 +34,6 @@ export function MedidorSemicirculo({
     return `M ${a.x.toFixed(2)} ${a.y.toFixed(2)} A 90 90 0 0 1 ${b.x.toFixed(2)} ${b.y.toFixed(2)}`;
   };
 
-  // El arco entero es el rango, del mínimo al máximo; el objetivo cae en medio.
   const marca = punto(0.5);
 
   return (
@@ -37,8 +42,8 @@ export function MedidorSemicirculo({
       role="img"
       aria-label={`${valor} ${unidad} al día, con un rango de ${min} a ${max} ${unidad}`}
     >
-      <p className="font-mono text-4xl font-semibold text-ink tabular-nums">
-        {valor.toLocaleString("es-CO")}
+      <p className="font-mono text-5xl font-semibold text-ink tabular-nums">
+        {Math.round(animado).toLocaleString("es-CO")}
         <span className="ml-1 text-base font-normal text-muted">{unidad}</span>
       </p>
 
@@ -47,7 +52,7 @@ export function MedidorSemicirculo({
           d={arco(0, 1)}
           fill="none"
           stroke="var(--accent)"
-          strokeOpacity="0.28"
+          strokeOpacity="0.2"
           strokeWidth="12"
           strokeLinecap="round"
         />
@@ -57,29 +62,23 @@ export function MedidorSemicirculo({
           stroke="var(--accent)"
           strokeWidth="12"
           strokeLinecap="round"
+          pathLength={1}
+          strokeDasharray={1}
+          style={{ animation: "dibuja 1200ms cubic-bezier(0.4, 0, 0.2, 1) 100ms both" }}
         />
-        <circle
-          cx={marca.x}
-          cy={marca.y}
-          r="9"
-          fill="var(--surface)"
-          stroke="var(--accent)"
-          strokeWidth="4"
-        />
+        <g style={{ animation: "pop 400ms ease 1100ms both", transformOrigin: `${marca.x}px ${marca.y}px` }}>
+          <circle cx={marca.x} cy={marca.y} r="9" fill="var(--surface)" stroke="var(--accent)" strokeWidth="4" />
+        </g>
       </svg>
 
       <figcaption className="mt-1 flex justify-between px-1 text-sm text-muted">
         <span>
           <span className="block text-xs">Mínimo</span>
-          <span className="font-mono text-ink-2 tabular-nums">
-            {min.toLocaleString("es-CO")}
-          </span>
+          <span className="font-mono text-ink-2 tabular-nums">{min.toLocaleString("es-CO")}</span>
         </span>
         <span>
           <span className="block text-xs">Máximo</span>
-          <span className="font-mono text-ink-2 tabular-nums">
-            {max.toLocaleString("es-CO")}
-          </span>
+          <span className="font-mono text-ink-2 tabular-nums">{max.toLocaleString("es-CO")}</span>
         </span>
       </figcaption>
     </figure>

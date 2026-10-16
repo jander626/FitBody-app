@@ -1,18 +1,21 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Aviso } from "@/components/ui";
 import { MedidorSemicirculo } from "@/components/medidor-semicirculo";
+import { Confeti, useCuenta } from "@/components/movimiento";
+import { ProyeccionPeso } from "@/components/proyeccion-peso";
+import { SelectorNumero } from "@/components/selector-numero";
 import { clienteNavegador } from "@/lib/supabase/cliente-navegador";
 import {
-  EDAD_MINIMA,
   EntradaSchema,
   pesoMetaCoherente,
   planDeEntrada,
   preguntaPesoMeta,
   preguntaRitmo,
   semanasHastaMeta,
+  EDAD_MINIMA,
   type Entrada as EntradaDatos,
 } from "@/lib/entrada/entrada";
 import {
@@ -26,11 +29,17 @@ import {
 } from "@/lib/nutrition/metas";
 
 /**
- * El flujo de entrada: preguntas, plan y, al final, la cuenta.
+ * El flujo de entrada: una pregunta por pantalla, plan y, al final, la cuenta.
  *
  * Va en este orden a propósito. Pedir el correo primero es pedirle a un
  * desconocido que confíe antes de recibir nada; verle su número primero es
  * darle algo que ya es suyo. El correo llega cuando ya hay algo que guardar.
+ *
+ * Es deliberadamente dinámico: elegir avanza solo, cada pantalla entra
+ * deslizándose desde el lado al que se va, los números se deslizan en vez de
+ * teclearse, y el plan "se calcula" con su pequeña espera. Nada de eso cambia
+ * el resultado; cambia cómo se siente llegar a él, que es lo que decide si
+ * alguien termina la encuesta.
  *
  * Las respuestas se guardan en el navegador mientras se contesta, para que
  * recargar o volver de otra app no obligue a empezar de cero. Y viajan con el
@@ -43,14 +52,31 @@ type Paso =
   | "meta"
   | "actividad"
   | "ritmo"
-  | "datos"
+  | "sexo"
+  | "edad"
+  | "estatura"
+  | "peso"
   | "pesoMeta"
   | "salud"
   | "creando"
   | "plan"
+  | "proyeccion"
   | "cuenta";
 
-const CLAVE_BORRADOR = "fitfood-entrada";
+/** Los pasos que cuentan como "preguntas" en la barra de progreso. */
+const PREGUNTAS: Paso[] = [
+  "meta",
+  "actividad",
+  "ritmo",
+  "sexo",
+  "edad",
+  "estatura",
+  "peso",
+  "pesoMeta",
+  "salud",
+];
+
+const CLAVE_BORRADOR = "fitfood-entrada-v2";
 
 const METAS_ENTRADA: { id: Meta; emoji: string; titulo: string; detalle: string }[] = [
   { id: "bajar_grasa", emoji: "🔥", titulo: "Bajar de peso", detalle: "Perder grasa a un ritmo que se sostenga." },
@@ -59,13 +85,22 @@ const METAS_ENTRADA: { id: Meta; emoji: string; titulo: string; detalle: string 
   { id: "ganar_musculo", emoji: "🏋️", titulo: "Ganar músculo", detalle: "Subir de peso entrenando fuerza." },
 ];
 
+const EMOJI_ACTIVIDAD: Record<NivelActividad, string> = {
+  sedentario: "🛋️",
+  poco: "🚶",
+  moderado: "🏃",
+  alto: "🏋️",
+  muy_alto: "⚡",
+};
+
+const EMOJI_RITMO: Record<Ritmo, string> = { suave: "🐢", normal: "🚶", rapido: "🐇" };
+
 const EXPECTATIVA: Record<Meta, string> = {
   bajar_grasa:
     "Comerás un poco menos de lo que gastas. Con proteína alta y algo de entrenamiento, lo que baja es sobre todo grasa.",
   tonificar:
     "Es bajar de peso despacio y con la proteína más alta. La balanza casi no se mueve; lo que cambia es cómo te queda la ropa, y toma meses.",
-  mantener:
-    "Comerás lo que gastas. El registro sirve para ver qué comes, no para cambiarlo.",
+  mantener: "Comerás lo que gastas. El registro sirve para ver qué comes, no para cambiarlo.",
   ganar_musculo:
     "Comerás un poco más de lo que gastas. Parte de lo que subas será grasa: no hay forma de evitarlo del todo.",
 };
@@ -75,10 +110,11 @@ interface Borrador {
   actividad: NivelActividad | null;
   ritmo: Ritmo | null;
   sexo: "hombre" | "mujer" | null;
-  edad: string;
-  estatura: string;
-  peso: string;
-  pesoMeta: string;
+  edad: number;
+  estatura: number;
+  peso: number;
+  /** Null = sin peso objetivo (lo omitió o no aplica). */
+  pesoMeta: number | null;
   condicion: boolean | null;
 }
 
@@ -87,31 +123,33 @@ const VACIO: Borrador = {
   actividad: null,
   ritmo: null,
   sexo: null,
-  edad: "",
-  estatura: "",
-  peso: "",
-  pesoMeta: "",
+  edad: 30,
+  estatura: 170,
+  peso: 70,
+  pesoMeta: null,
   condicion: null,
 };
 
 function leerBorrador(): Borrador {
   try {
     const crudo = localStorage.getItem(CLAVE_BORRADOR);
-    return crudo ? { ...VACIO, ...JSON.parse(crudo) } : VACIO;
+    return crudo ? { ...VACIO, ...JSON.parse(crudo), condicion: null } : VACIO;
   } catch {
     return VACIO;
   }
 }
 
-const numero = (v: string): number | null => {
-  const n = Number(v.replace(",", "."));
-  return v.trim() === "" || !Number.isFinite(n) ? null : n;
-};
+/** Peso objetivo sugerido: algo alcanzable, para que arrastrar sea afinar. */
+function metaSugerida(meta: Meta, peso: number): number {
+  return meta === "ganar_musculo" ? Math.round(peso * 1.06) : Math.round(peso * 0.92);
+}
 
 export function Entrada() {
   const [b, setB] = useState<Borrador>(VACIO);
   const [paso, setPaso] = useState<Paso>("meta");
+  const [direccion, setDireccion] = useState<"adelante" | "atras">("adelante");
   const [listo, setListo] = useState(false);
+  const temporizador = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // El borrador se lee después de montar: leerlo durante el render daría un
   // HTML distinto en servidor y cliente.
@@ -132,30 +170,14 @@ export function Entrada() {
     }
   }, [b, listo]);
 
-  const cambiar = (parte: Partial<Borrador>) => setB((previo) => ({ ...previo, ...parte }));
-
-  const pasos: Paso[] = useMemo(
-    () => [
-      "meta",
-      "actividad",
-      ...(b.meta && preguntaRitmo(b.meta) ? (["ritmo"] as Paso[]) : []),
-      "datos",
-      ...(b.meta && preguntaPesoMeta(b.meta) ? (["pesoMeta"] as Paso[]) : []),
-      "salud",
-      "creando",
-      "plan",
-      "cuenta",
-    ],
-    [b.meta],
+  useEffect(
+    () => () => {
+      if (temporizador.current) clearTimeout(temporizador.current);
+    },
+    [],
   );
-  const indice = pasos.indexOf(paso);
-  const avanzar = () => setPaso(pasos[Math.min(indice + 1, pasos.length - 1)]);
-  const volver = () => setPaso(pasos[Math.max(indice - 1, 0)]);
 
-  const edad = numero(b.edad);
-  const estatura = numero(b.estatura);
-  const peso = numero(b.peso);
-  const pesoMeta = numero(b.pesoMeta);
+  const cambiar = (parte: Partial<Borrador>) => setB((previo) => ({ ...previo, ...parte }));
 
   const entrada: EntradaDatos | null = useMemo(() => {
     if (!b.meta || !b.actividad || !b.sexo) return null;
@@ -164,53 +186,86 @@ export function Entrada() {
       actividad: b.actividad,
       ...(b.ritmo && preguntaRitmo(b.meta) ? { ritmo: b.ritmo } : {}),
       sexo: b.sexo,
-      edad,
-      estaturaCm: estatura,
-      pesoKg: peso,
-      ...(pesoMeta !== null && preguntaPesoMeta(b.meta) ? { pesoMetaKg: pesoMeta } : {}),
+      edad: b.edad,
+      estaturaCm: b.estatura,
+      pesoKg: b.peso,
+      ...(b.pesoMeta !== null && preguntaPesoMeta(b.meta) ? { pesoMetaKg: b.pesoMeta } : {}),
     });
     return analisis.success ? analisis.data : null;
-  }, [b, edad, estatura, peso, pesoMeta]);
+  }, [b]);
 
   const plan = useMemo(() => (entrada ? planDeEntrada(entrada) : null), [entrada]);
 
-  // Pasar por "creando" solo tiene sentido con un plan que mostrar.
-  useEffect(() => {
-    if (paso !== "creando") return;
-    const t = setTimeout(() => setPaso("plan"), 2600);
-    return () => clearTimeout(t);
-  }, [paso]);
+  const semanas = useMemo(
+    () =>
+      entrada && plan && entrada.pesoMetaKg !== undefined
+        ? semanasHastaMeta(entrada.pesoKg, entrada.pesoMetaKg, plan.calculo.ritmoEsperadoKgSemana)
+        : null,
+    [entrada, plan],
+  );
 
-  const menor = edad !== null && edad < EDAD_MINIMA;
-  const personaValida = EntradaSchema.pick({
-    sexo: true,
-    edad: true,
-    estaturaCm: true,
-    pesoKg: true,
-  }).safeParse({ sexo: b.sexo, edad, estaturaCm: estatura, pesoKg: peso }).success;
-  const datosCompletos = personaValida;
-  const hayDatosFueraDeRango =
-    !menor &&
-    !personaValida &&
-    b.sexo !== null &&
-    edad !== null &&
-    estatura !== null &&
-    peso !== null;
+  const pasos: Paso[] = useMemo(
+    () => [
+      "meta",
+      "actividad",
+      ...(b.meta && preguntaRitmo(b.meta) ? (["ritmo"] as Paso[]) : []),
+      "sexo",
+      "edad",
+      "estatura",
+      "peso",
+      ...(b.meta && preguntaPesoMeta(b.meta) ? (["pesoMeta"] as Paso[]) : []),
+      "salud",
+      "creando",
+      "plan",
+      ...(semanas !== null ? (["proyeccion"] as Paso[]) : []),
+      "cuenta",
+    ],
+    [b.meta, semanas],
+  );
+  const indice = pasos.indexOf(paso);
 
-  // El borrador puede traer un paso que ya no corresponde (cambió la meta).
-  const sinPasoValido = !pasos.includes(paso);
+  const irA = (destino: Paso, sentido: "adelante" | "atras" = "adelante") => {
+    setDireccion(sentido);
+    setPaso(destino);
+  };
+  const avanzar = () => irA(pasos[Math.min(indice + 1, pasos.length - 1)]);
+  const volver = () => irA(pasos[Math.max(indice - 1, 0)], "atras");
+
+  /** Marca la elección y avanza un instante después, para que se vea el pop. */
+  const elegir = (parte: Partial<Borrador>, destino?: Paso) => {
+    cambiar(parte);
+    if (temporizador.current) clearTimeout(temporizador.current);
+    temporizador.current = setTimeout(() => (destino ? irA(destino) : avanzar()), 280);
+  };
+
+  // El paso del borrador puede dejar de existir (cambió la meta, por ejemplo).
+  const sinPasoValido = indice === -1;
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- corrige el paso cuando cambian los pasos válidos
     if (sinPasoValido) setPaso("meta");
   }, [sinPasoValido]);
 
-  const mostrarBarra = paso !== "creando" && paso !== "plan" && paso !== "cuenta";
-  const visibles = pasos.filter((p) => p !== "creando" && p !== "plan" && p !== "cuenta");
+  // "Creando" es una espera con sentido: hay un plan que mostrar al terminar.
+  useEffect(() => {
+    if (paso !== "creando") return;
+    const t = setTimeout(() => {
+      setDireccion("adelante");
+      setPaso("plan");
+    }, 2900);
+    return () => clearTimeout(t);
+  }, [paso]);
+
+  const preguntasVisibles = pasos.filter((p) => PREGUNTAS.includes(p));
+  const indicePregunta = preguntasVisibles.indexOf(paso);
+  const mostrarBarra = indicePregunta !== -1;
+  const sinAtras = indice <= 0 || paso === "creando";
 
   return (
-    <main className="safe-top mx-auto flex min-h-dvh max-w-md flex-col px-5 pb-8">
+    <main className="safe-top mx-auto flex min-h-dvh max-w-md flex-col overflow-x-hidden px-5 pb-8">
       <header className="flex items-center gap-3 pt-5">
-        {indice > 0 && paso !== "creando" ? (
+        {sinAtras ? (
+          <span className="h-11 w-11 shrink-0" aria-hidden="true" />
+        ) : (
           <button
             type="button"
             onClick={volver}
@@ -219,41 +274,51 @@ export function Entrada() {
           >
             ←
           </button>
-        ) : (
-          <span className="h-11 w-11 shrink-0" aria-hidden="true" />
         )}
 
         {mostrarBarra && (
           <div
             className="h-1.5 flex-1 overflow-hidden rounded-full bg-hairline-soft"
             role="img"
-            aria-label={`Paso ${Math.min(indice + 1, visibles.length)} de ${visibles.length}`}
+            aria-label={`Pregunta ${indicePregunta + 1} de ${preguntasVisibles.length}`}
           >
             <div
-              className="h-full rounded-full bg-accent transition-[width] duration-300"
-              style={{ width: `${((indice + 1) / visibles.length) * 100}%` }}
+              className="h-full rounded-full bg-accent transition-[width] duration-500 ease-out"
+              style={{ width: `${((indicePregunta + 1) / preguntasVisibles.length) * 100}%` }}
             />
           </div>
         )}
       </header>
 
-      <div className="flex flex-1 flex-col pt-8">
+      {/* La clave hace que cada paso sea un elemento nuevo: así entra con su
+          animación, deslizándose desde el lado al que se va. */}
+      <div
+        key={paso}
+        className={`flex flex-1 flex-col pt-8 ${direccion === "adelante" ? "paso-adelante" : "paso-atras"}`}
+      >
         {paso === "meta" && (
           <Pregunta titulo="¿Cuál es tu objetivo?" ayuda="Con esto calculamos cuántas calorías necesitas.">
-            {METAS_ENTRADA.map((m) => (
+            {METAS_ENTRADA.map((m, i) => (
               <Opcion
                 key={m.id}
+                i={i}
                 emoji={m.emoji}
                 titulo={m.titulo}
                 detalle={m.detalle}
                 elegida={b.meta === m.id}
-                onElegir={() => {
-                  cambiar({ meta: m.id, ritmo: preguntaRitmo(m.id) ? b.ritmo : null });
-                  setPaso("actividad");
-                }}
+                onElegir={() =>
+                  elegir(
+                    {
+                      meta: m.id,
+                      ritmo: preguntaRitmo(m.id) ? b.ritmo : null,
+                      pesoMeta: null,
+                    },
+                    "actividad",
+                  )
+                }
               />
             ))}
-            <p className="pt-2 text-center text-sm text-muted">
+            <p className="entra pt-2 text-center text-sm text-muted" style={{ "--i": 5 } as React.CSSProperties}>
               ¿Ya tienes cuenta?{" "}
               <Link href="/login" className="text-accent underline underline-offset-4">
                 Entrar
@@ -267,104 +332,105 @@ export function Entrada() {
             titulo="¿Cuánto te mueves en una semana?"
             ayuda="Ante la duda, elige el de abajo: sobrestimarlo infla tu objetivo."
           >
-            {ORDEN_ACTIVIDADES.map((id) => (
+            {ORDEN_ACTIVIDADES.map((id, i) => (
               <Opcion
                 key={id}
+                i={i}
+                emoji={EMOJI_ACTIVIDAD[id]}
                 titulo={ACTIVIDADES[id].titulo}
                 detalle={ACTIVIDADES[id].detalle}
                 elegida={b.actividad === id}
-                onElegir={() => {
-                  cambiar({ actividad: id });
-                  avanzar();
-                }}
+                onElegir={() => elegir({ actividad: id })}
               />
             ))}
           </Pregunta>
         )}
 
         {paso === "ritmo" && (
-          <Pregunta titulo="¿A qué ritmo quieres avanzar?">
-            {ORDEN_RITMOS.map((id) => (
+          <Pregunta titulo="¿A qué ritmo quieres avanzar?" ayuda="El del medio es el que casi todos sostienen.">
+            {ORDEN_RITMOS.map((id, i) => (
               <Opcion
                 key={id}
+                i={i}
+                emoji={EMOJI_RITMO[id]}
                 titulo={RITMOS[id].titulo}
                 detalle={RITMOS[id].detalle}
                 elegida={b.ritmo === id}
-                onElegir={() => {
-                  cambiar({ ritmo: id });
-                  avanzar();
-                }}
+                onElegir={() => elegir({ ritmo: id })}
               />
             ))}
           </Pregunta>
         )}
 
-        {paso === "datos" && (
-          <Pregunta titulo="Sobre ti" ayuda="Esta información nos ayuda a calcular tus calorías objetivo.">
-            <div className="grid grid-cols-2 gap-3">
-              {(["hombre", "mujer"] as const).map((s) => (
-                <Opcion
-                  key={s}
-                  titulo={s === "hombre" ? "Hombre" : "Mujer"}
-                  elegida={b.sexo === s}
-                  onElegir={() => cambiar({ sexo: s })}
-                />
-              ))}
-            </div>
-            <div className="grid grid-cols-3 gap-3">
-              <CampoNumero etiqueta="Edad" unidad="años" valor={b.edad} onCambiar={(v) => cambiar({ edad: v })} modo="numeric" />
-              <CampoNumero etiqueta="Altura" unidad="cm" valor={b.estatura} onCambiar={(v) => cambiar({ estatura: v })} modo="numeric" />
-              <CampoNumero etiqueta="Peso" unidad="kg" valor={b.peso} onCambiar={(v) => cambiar({ peso: v })} modo="decimal" />
-            </div>
-            {menor && (
-              <Aviso nivel="atencion">
-                Esta app es para mayores de {EDAD_MINIMA} años. Si quieres cuidar tu alimentación,
-                hazlo con un pediatra o un nutricionista.
-              </Aviso>
-            )}
-            {hayDatosFueraDeRango && (
-              <Aviso nivel="atencion">
-                Revisa los valores: la edad, la altura (100 a 250 cm) o el peso (20 a 400 kg) no parecen
-                correctos.
-              </Aviso>
-            )}
-            <Principal deshabilitado={!datosCompletos} onClick={avanzar}>
-              Continuar
-            </Principal>
+        {paso === "sexo" && (
+          <Pregunta titulo="¿Cuál es tu sexo?" ayuda="Lo usamos para calcular cuánta energía gastas en reposo.">
+            {(["hombre", "mujer"] as const).map((s, i) => (
+              <Opcion
+                key={s}
+                i={i}
+                emoji={s === "hombre" ? "🙋‍♂️" : "🙋‍♀️"}
+                titulo={s === "hombre" ? "Hombre" : "Mujer"}
+                elegida={b.sexo === s}
+                onElegir={() =>
+                  elegir(
+                    // Valores de partida cercanos a lo típico, para que el
+                    // deslizador arranque cerca de la respuesta.
+                    b.sexo === null ? { sexo: s, estatura: s === "hombre" ? 172 : 160, peso: s === "hombre" ? 78 : 64 } : { sexo: s },
+                  )
+                }
+              />
+            ))}
           </Pregunta>
         )}
 
-        {paso === "pesoMeta" && b.meta && peso !== null && (
-          <Pregunta titulo="¿Cuál es tu peso objetivo?" ayuda={`Hoy pesas ${peso} kg.`}>
-            <CampoNumero
-              etiqueta="Peso objetivo"
-              unidad="kg"
-              valor={b.pesoMeta}
-              onCambiar={(v) => cambiar({ pesoMeta: v })}
-              modo="decimal"
-            />
-            {pesoMeta !== null && !pesoMetaCoherente(b.meta, peso, pesoMeta) && (
-              <Aviso nivel="atencion">
-                {b.meta === "ganar_musculo"
-                  ? "Para ganar músculo, tu peso objetivo debe ser mayor al de hoy."
-                  : "Para bajar, tu peso objetivo debe ser menor al de hoy."}
-              </Aviso>
-            )}
-            <Principal
-              deshabilitado={pesoMeta === null || !pesoMetaCoherente(b.meta, peso, pesoMeta)}
-              onClick={avanzar}
-            >
-              Continuar
-            </Principal>
-            <Secundario
-              onClick={() => {
-                cambiar({ pesoMeta: "" });
-                avanzar();
-              }}
-            >
-              Prefiero no ponerlo
-            </Secundario>
+        {paso === "edad" && (
+          <Pregunta titulo="¿Cuántos años tienes?" ayuda={`La app es para mayores de ${EDAD_MINIMA} años.`}>
+            <div className="entra pt-6">
+              <SelectorNumero etiqueta="edad" unidad="años" valor={b.edad} min={EDAD_MINIMA} max={90} onCambiar={(v) => cambiar({ edad: v })} />
+            </div>
+            <Continuar onClick={avanzar} />
           </Pregunta>
+        )}
+
+        {paso === "estatura" && (
+          <Pregunta titulo="¿Cuánto mides?">
+            <div className="entra pt-6">
+              <SelectorNumero etiqueta="altura" unidad="cm" valor={b.estatura} min={130} max={220} onCambiar={(v) => cambiar({ estatura: v })} />
+            </div>
+            <Continuar onClick={avanzar} />
+          </Pregunta>
+        )}
+
+        {paso === "peso" && (
+          <Pregunta titulo="¿Cuánto pesas hoy?" ayuda="Un número aproximado sirve; lo afinas después.">
+            <div className="entra pt-6">
+              <SelectorNumero
+                etiqueta="peso"
+                unidad="kg"
+                valor={b.peso}
+                min={40}
+                max={200}
+                paso={0.5}
+                decimales={1}
+                onCambiar={(v) => cambiar({ peso: v })}
+              />
+            </div>
+            <Continuar onClick={avanzar} />
+          </Pregunta>
+        )}
+
+        {paso === "pesoMeta" && b.meta && (
+          <PesoMeta
+            meta={b.meta}
+            peso={b.peso}
+            valor={b.pesoMeta}
+            onCambiar={(v) => cambiar({ pesoMeta: v })}
+            onContinuar={avanzar}
+            onOmitir={() => {
+              cambiar({ pesoMeta: null });
+              avanzar();
+            }}
+          />
         )}
 
         {paso === "salud" && (
@@ -372,23 +438,9 @@ export function Entrada() {
             titulo="¿Tienes alguna condición de salud?"
             ayuda="Embarazo o lactancia, diabetes, enfermedad renal o cardiaca, o antecedentes de trastornos de la conducta alimentaria."
           >
-            <Opcion
-              titulo="Sí"
-              elegida={b.condicion === true}
-              onElegir={() => {
-                cambiar({ condicion: true });
-                setPaso("creando");
-              }}
-            />
-            <Opcion
-              titulo="No"
-              elegida={b.condicion === false}
-              onElegir={() => {
-                cambiar({ condicion: false });
-                setPaso("creando");
-              }}
-            />
-            <p className="text-center text-xs text-muted">
+            <Opcion i={0} emoji="⚕️" titulo="Sí" elegida={b.condicion === true} onElegir={() => elegir({ condicion: true }, "creando")} />
+            <Opcion i={1} emoji="✅" titulo="No" elegida={b.condicion === false} onElegir={() => elegir({ condicion: false }, "creando")} />
+            <p className="entra text-center text-xs text-muted" style={{ "--i": 3 } as React.CSSProperties}>
               Tu respuesta no sale de este teléfono: solo la usamos para mostrarte un aviso.
             </p>
           </Pregunta>
@@ -399,56 +451,32 @@ export function Entrada() {
         {paso === "plan" && plan && entrada && b.meta && (
           <div className="space-y-5">
             <div className="text-center">
-              <p className="text-4xl" aria-hidden="true">
-                ✅
+              <p className="relative mx-auto flex h-16 w-16 items-center justify-center text-5xl" aria-hidden="true">
+                <span className="pop">✅</span>
+                <Confeti />
               </p>
-              <h1 className="mt-3 font-serif text-2xl text-ink">
+              <h1 className="entra mt-3 font-serif text-2xl text-ink" style={{ "--i": 1 } as React.CSSProperties}>
                 Estas son las calorías que necesitas al día
               </h1>
             </div>
 
-            <Tarjeta>
-              <MedidorSemicirculo
-                valor={plan.calculo.kcalObjetivo}
-                unidad="kcal"
-                min={plan.rango.min}
-                max={plan.rango.max}
-              />
+            <div className="entra rounded-3xl border border-hairline bg-surface p-5 shadow-[var(--shadow)]" style={{ "--i": 2 } as React.CSSProperties}>
+              <MedidorSemicirculo valor={plan.calculo.kcalObjetivo} unidad="kcal" min={plan.rango.min} max={plan.rango.max} />
               <div className="mt-5 grid grid-cols-3 gap-2 text-center">
-                <Macro etiqueta="Proteínas" g={plan.calculo.proteinaG} color="var(--macro-prot)" />
-                <Macro etiqueta="Carbos" g={plan.calculo.carbsG} color="var(--macro-carb)" />
-                <Macro etiqueta="Grasas" g={plan.calculo.grasaG} color="var(--macro-gras)" />
+                <Macro i={0} etiqueta="Proteínas" g={plan.calculo.proteinaG} color="var(--macro-prot)" />
+                <Macro i={1} etiqueta="Carbos" g={plan.calculo.carbsG} color="var(--macro-carb)" />
+                <Macro i={2} etiqueta="Grasas" g={plan.calculo.grasaG} color="var(--macro-gras)" />
               </div>
-            </Tarjeta>
+            </div>
 
-            {entrada.pesoMetaKg !== undefined &&
-              (() => {
-                const semanas = semanasHastaMeta(
-                  entrada.pesoKg,
-                  entrada.pesoMetaKg,
-                  plan.calculo.ritmoEsperadoKgSemana,
-                );
-                return (
-                  <Tarjeta>
-                    <p className="text-sm text-muted">Tu objetivo</p>
-                    <p className="mt-1 font-mono text-lg text-ink tabular-nums">
-                      {entrada.pesoKg} kg → {entrada.pesoMetaKg} kg
-                    </p>
-                    <p className="mt-2 text-sm text-ink-2">
-                      {semanas !== null
-                        ? `A este ritmo, unas ${semanas} semanas. Es una estimación: tu cuerpo puede ir más rápido o más lento.`
-                        : "Con este plan no se puede estimar cuánto tardarías. Ajustaremos el plan con lo que muestre tu peso."}
-                    </p>
-                  </Tarjeta>
-                );
-              })()}
-
-            <Aviso nivel="info">{EXPECTATIVA[b.meta]}</Aviso>
+            <div className="entra" style={{ "--i": 4 } as React.CSSProperties}>
+              <Aviso nivel="info">{EXPECTATIVA[b.meta]}</Aviso>
+            </div>
 
             {b.condicion && (
               <Aviso nivel="atencion">
-                Por tu condición de salud, habla con tu médico o un nutricionista antes de cambiar tu
-                alimentación. Usa este plan solo como referencia.
+                Por tu condición de salud, habla con tu médico o un nutricionista antes de cambiar tu alimentación. Usa este plan
+                solo como referencia.
               </Aviso>
             )}
             {plan.calculo.avisos.map((aviso, i) => (
@@ -457,24 +485,89 @@ export function Entrada() {
               </Aviso>
             ))}
 
-            <Principal onClick={avanzar}>Guardar mi plan</Principal>
+            <Principal onClick={avanzar}>Continuar</Principal>
             <p className="text-center text-xs text-muted">
-              Es un cálculo, no una verdad: un punto de partida que la app ajusta con lo que muestre tu
-              peso. No reemplaza la consulta con un profesional de la salud.
+              Es un cálculo, no una verdad: un punto de partida que la app ajusta con lo que muestre tu peso. No reemplaza la
+              consulta con un profesional de la salud.
             </p>
+          </div>
+        )}
+
+        {paso === "proyeccion" && entrada && entrada.pesoMetaKg !== undefined && semanas !== null && (
+          <div className="space-y-5">
+            <div className="text-center">
+              <h1 className="entra font-serif text-2xl text-ink">
+                {entrada.pesoMetaKg < entrada.pesoKg ? "Así sería tu camino" : "Así sería tu progreso"}
+              </h1>
+              <p className="entra mt-2 text-sm text-muted" style={{ "--i": 1 } as React.CSSProperties}>
+                A este ritmo, unas <span className="font-medium text-ink">{semanas} semanas</span> hasta tu peso objetivo.
+              </p>
+            </div>
+            <div className="entra rounded-3xl border border-hairline bg-surface p-5 shadow-[var(--shadow)]" style={{ "--i": 2 } as React.CSSProperties}>
+              <ProyeccionPeso pesoKg={entrada.pesoKg} metaKg={entrada.pesoMetaKg} semanas={semanas} />
+            </div>
+            <p className="entra text-center text-xs text-muted" style={{ "--i": 3 } as React.CSSProperties}>
+              Es una estimación: tu cuerpo puede ir más rápido o más lento, y la app ajusta el plan con lo que muestre tu peso.
+            </p>
+            <Principal onClick={avanzar}>Guardar mi plan</Principal>
           </div>
         )}
 
         {paso === "cuenta" && entrada && <Cuenta entrada={entrada} />}
 
-        {(paso === "plan" || paso === "cuenta") && !entrada && (
+        {(paso === "plan" || paso === "proyeccion" || paso === "cuenta") && !entrada && (
           <div className="space-y-4 text-center">
             <p className="text-sm text-ink-2">Faltan datos para armar tu plan. Revisa tus respuestas.</p>
-            <Principal onClick={() => setPaso("meta")}>Volver al inicio</Principal>
+            <Principal onClick={() => irA("meta", "atras")}>Volver al inicio</Principal>
           </div>
         )}
       </div>
     </main>
+  );
+}
+
+// ------------------------------------------------------------- peso meta ---
+
+function PesoMeta({
+  meta,
+  peso,
+  valor,
+  onCambiar,
+  onContinuar,
+  onOmitir,
+}: {
+  meta: Meta;
+  peso: number;
+  valor: number | null;
+  onCambiar: (v: number) => void;
+  onContinuar: () => void;
+  onOmitir: () => void;
+}) {
+  const sube = meta === "ganar_musculo";
+  const min = sube ? peso + 1 : Math.max(40, Math.round(peso * 0.6));
+  const max = sube ? Math.min(200, Math.round(peso * 1.3)) : peso - 1;
+  const sugerido = Math.min(max, Math.max(min, metaSugerida(meta, peso)));
+  const actual = valor !== null && pesoMetaCoherente(meta, peso, valor) ? valor : sugerido;
+  const diferencia = Math.abs(actual - peso);
+
+  return (
+    <Pregunta titulo="¿Cuál es tu peso objetivo?" ayuda={`Hoy pesas ${String(peso).replace(".", ",")} kg.`}>
+      <div className="entra pt-4">
+        <SelectorNumero etiqueta="peso objetivo" unidad="kg" valor={actual} min={min} max={max} onCambiar={onCambiar} />
+      </div>
+      <p className="entra pt-2 text-center text-sm text-ink-2" style={{ "--i": 1 } as React.CSSProperties}>
+        {sube ? "Subirías" : "Bajarías"} <span className="font-medium">{String(diferencia).replace(".", ",")} kg</span>
+      </p>
+      <Principal
+        onClick={() => {
+          onCambiar(actual);
+          onContinuar();
+        }}
+      >
+        Continuar
+      </Principal>
+      <Secundario onClick={onOmitir}>Prefiero no ponerlo</Secundario>
+    </Pregunta>
   );
 }
 
@@ -517,13 +610,13 @@ function Cuenta({ entrada }: { entrada: EntradaDatos }) {
   if (estado.tipo === "enviado") {
     return (
       <div className="space-y-4 text-center">
-        <p className="text-5xl" aria-hidden="true">
+        <p className="pop text-5xl" aria-hidden="true">
           📬
         </p>
-        <h1 className="font-serif text-2xl text-ink">Revisa tu correo</h1>
-        <p className="text-sm text-ink-2">
-          Te enviamos un enlace a <span className="font-medium">{estado.email}</span>. Ábrelo desde este
-          mismo teléfono para entrar y ver tu plan. Vence en una hora.
+        <h1 className="entra font-serif text-2xl text-ink">Revisa tu correo</h1>
+        <p className="entra text-sm text-ink-2" style={{ "--i": 1 } as React.CSSProperties}>
+          Te enviamos un enlace a <span className="font-medium">{estado.email}</span>. Ábrelo desde este mismo teléfono para
+          entrar y ver tu plan. Vence en una hora.
         </p>
         <Secundario onClick={() => setEstado({ tipo: "inicial" })}>Usar otro correo</Secundario>
       </div>
@@ -533,11 +626,13 @@ function Cuenta({ entrada }: { entrada: EntradaDatos }) {
   return (
     <form onSubmit={enviar} className="space-y-4">
       <div className="text-center">
-        <h1 className="font-serif text-2xl text-ink">¡Casi listo! Crea tu cuenta para guardar tu plan</h1>
-        <p className="mt-2 text-sm text-muted">Sin contraseña: te enviamos un enlace que te deja adentro.</p>
+        <h1 className="entra font-serif text-2xl text-ink">¡Casi listo! Crea tu cuenta para guardar tu plan</h1>
+        <p className="entra mt-2 text-sm text-muted" style={{ "--i": 1 } as React.CSSProperties}>
+          Sin contraseña: te enviamos un enlace que te deja adentro.
+        </p>
       </div>
 
-      <label htmlFor="email" className="block text-sm font-medium text-ink-2">
+      <label htmlFor="email" className="entra block text-sm font-medium text-ink-2" style={{ "--i": 2 } as React.CSSProperties}>
         Tu correo
       </label>
       <input
@@ -549,7 +644,8 @@ function Cuenta({ entrada }: { entrada: EntradaDatos }) {
         value={email}
         onChange={(e) => setEmail(e.target.value)}
         placeholder="tu@correo.com"
-        className="w-full rounded-2xl border border-hairline bg-surface px-4 py-3.5 text-base text-ink outline-none placeholder:text-muted focus:border-accent"
+        className="entra w-full rounded-2xl border border-hairline bg-surface px-4 py-3.5 text-base text-ink outline-none placeholder:text-muted focus:border-accent"
+        style={{ "--i": 3 } as React.CSSProperties}
       />
 
       <Principal tipo="submit" deshabilitado={estado.tipo === "enviando" || email.length === 0}>
@@ -570,18 +666,37 @@ function Cuenta({ entrada }: { entrada: EntradaDatos }) {
 function Creando() {
   const lineas = ["Analizando tu meta", "Calculando tus calorías", "Ajustando tus macros"];
   const [hechas, setHechas] = useState(0);
+  const porcentaje = useCuenta(100, 2600);
 
   useEffect(() => {
-    const ts = lineas.map((_, i) => setTimeout(() => setHechas(i + 1), 700 * (i + 1)));
+    const ts = lineas.map((_, i) => setTimeout(() => setHechas(i + 1), 800 * (i + 1) - 200));
     return () => ts.forEach(clearTimeout);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- las líneas son constantes
   }, []);
 
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-8 text-center" aria-live="polite">
-      <div className="flex h-40 w-40 items-center justify-center rounded-full bg-accent-soft">
-        <div className="flex h-28 w-28 animate-pulse items-center justify-center rounded-full bg-accent-soft text-5xl">
-          🥗
+      <div className="relative flex h-44 w-44 items-center justify-center">
+        <svg viewBox="0 0 120 120" className="absolute inset-0 -rotate-90" aria-hidden="true">
+          <circle cx="60" cy="60" r="54" fill="none" stroke="var(--accent)" strokeOpacity="0.15" strokeWidth="8" />
+          <circle
+            cx="60"
+            cy="60"
+            r="54"
+            fill="none"
+            stroke="var(--accent)"
+            strokeWidth="8"
+            strokeLinecap="round"
+            pathLength={1}
+            strokeDasharray={1}
+            style={{ animation: "anillo 2600ms cubic-bezier(0.4, 0, 0.2, 1) both" }}
+          />
+        </svg>
+        <div className="respira flex flex-col items-center">
+          <span className="text-5xl" aria-hidden="true">
+            🥗
+          </span>
+          <span className="mt-1 font-mono text-sm text-muted tabular-nums">{Math.round(porcentaje)}%</span>
         </div>
       </div>
       <h1 className="font-serif text-2xl text-ink">Creando el mejor plan para ti…</h1>
@@ -589,8 +704,9 @@ function Creando() {
         {lineas.map((l, i) => (
           <li key={l} className="flex items-center gap-3 text-ink-2">
             <span
-              className={`flex h-6 w-6 items-center justify-center rounded-full text-xs ${
-                i < hechas ? "bg-accent text-sobre-accent" : "border border-hairline text-transparent"
+              key={i < hechas ? "ok" : "espera"}
+              className={`flex h-6 w-6 items-center justify-center rounded-full text-xs transition-colors ${
+                i < hechas ? "pop bg-accent text-sobre-accent" : "border border-hairline text-transparent"
               }`}
               aria-hidden="true"
             >
@@ -604,15 +720,7 @@ function Creando() {
   );
 }
 
-function Pregunta({
-  titulo,
-  ayuda,
-  children,
-}: {
-  titulo: string;
-  ayuda?: string;
-  children: React.ReactNode;
-}) {
+function Pregunta({ titulo, ayuda, children }: { titulo: string; ayuda?: string; children: React.ReactNode }) {
   return (
     <section className="space-y-3">
       <div className="pb-3 text-center">
@@ -625,12 +733,14 @@ function Pregunta({
 }
 
 function Opcion({
+  i,
   emoji,
   titulo,
   detalle,
   elegida,
   onElegir,
 }: {
+  i: number;
   emoji?: string;
   titulo: string;
   detalle?: string;
@@ -642,12 +752,13 @@ function Opcion({
       type="button"
       onClick={onElegir}
       aria-pressed={elegida}
-      className={`flex w-full items-center gap-3 rounded-2xl border px-4 py-4 text-left transition-colors ${
+      className={`entra flex w-full items-center gap-3 rounded-2xl border px-4 py-4 text-left transition-colors ${
         elegida ? "border-accent bg-accent-soft" : "border-transparent bg-hairline-soft"
       }`}
+      style={{ "--i": i + 1 } as React.CSSProperties}
     >
       {emoji && (
-        <span className="text-2xl" aria-hidden="true">
+        <span className={`text-2xl ${elegida ? "pop" : ""}`} aria-hidden="true">
           {emoji}
         </span>
       )}
@@ -656,8 +767,9 @@ function Opcion({
         {detalle && <span className="mt-0.5 block text-sm text-muted">{detalle}</span>}
       </span>
       <span
+        key={elegida ? "si" : "no"}
         className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs ${
-          elegida ? "border-accent bg-accent text-sobre-accent" : "border-hairline text-transparent"
+          elegida ? "pop border-accent bg-accent text-sobre-accent" : "border-hairline text-transparent"
         }`}
         aria-hidden="true"
       >
@@ -667,51 +779,25 @@ function Opcion({
   );
 }
 
-function CampoNumero({
-  etiqueta,
-  unidad,
-  valor,
-  onCambiar,
-  modo,
-}: {
-  etiqueta: string;
-  unidad: string;
-  valor: string;
-  onCambiar: (v: string) => void;
-  modo: "numeric" | "decimal";
-}) {
+function Macro({ i, etiqueta, g, color }: { i: number; etiqueta: string; g: number; color: string }) {
+  const animado = useCuenta(g, 900);
   return (
-    <label className="block">
-      <span className="text-sm font-medium text-ink-2">{etiqueta}</span>
-      <div className="mt-1.5 flex items-baseline gap-1 rounded-2xl border border-hairline bg-surface px-3.5 py-3 focus-within:border-accent">
-        <input
-          type="text"
-          inputMode={modo}
-          value={valor}
-          onChange={(e) => onCambiar(e.target.value.replace(/[^\d.,]/g, ""))}
-          className="w-full min-w-0 bg-transparent text-lg text-ink outline-none"
-          aria-label={`${etiqueta} en ${unidad}`}
-        />
-        <span className="text-xs text-muted">{unidad}</span>
-      </div>
-    </label>
-  );
-}
-
-function Tarjeta({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="rounded-3xl border border-hairline bg-surface p-5 shadow-[var(--shadow)]">
-      {children}
+    <div>
+      <p className="text-sm text-muted">{etiqueta}</p>
+      <p className="font-mono text-base font-semibold text-ink tabular-nums">{Math.round(animado)} g</p>
+      <div
+        className="crece-x mx-auto mt-1.5 h-1.5 w-12 rounded-full"
+        style={{ background: color, "--i": i } as React.CSSProperties}
+        aria-hidden="true"
+      />
     </div>
   );
 }
 
-function Macro({ etiqueta, g, color }: { etiqueta: string; g: number; color: string }) {
+function Continuar({ onClick }: { onClick: () => void }) {
   return (
-    <div>
-      <p className="text-sm text-muted">{etiqueta}</p>
-      <p className="font-mono text-base font-semibold text-ink tabular-nums">{g} g</p>
-      <div className="mx-auto mt-1.5 h-1.5 w-12 rounded-full" style={{ background: color }} aria-hidden="true" />
+    <div className="pt-8">
+      <Principal onClick={onClick}>Continuar</Principal>
     </div>
   );
 }
@@ -741,11 +827,7 @@ function Principal({
 
 function Secundario({ children, onClick }: { children: React.ReactNode; onClick: () => void }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="w-full rounded-full bg-hairline-soft px-5 py-4 text-base font-medium text-ink"
-    >
+    <button type="button" onClick={onClick} className="w-full rounded-full bg-hairline-soft px-5 py-4 text-base font-medium text-ink">
       {children}
     </button>
   );

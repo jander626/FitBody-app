@@ -13,7 +13,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 /** Rutas accesibles sin sesión. Todo lo demás exige estar dentro. */
-const PUBLICAS = ["/login", "/auth", "/offline"];
+const PUBLICAS = ["/login", "/auth", "/offline", "/empezar"];
 
 function esPublica(pathname: string): boolean {
   return PUBLICAS.some(
@@ -67,6 +67,14 @@ export async function proxy(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
+  // Quien llega sin sesión a la raíz es, casi siempre, alguien nuevo: va al
+  // flujo de entrada y no a una pantalla de login que no sabe qué decirle.
+  if (!user && pathname === "/") {
+    const destino = request.nextUrl.clone();
+    destino.pathname = "/empezar";
+    return NextResponse.redirect(destino);
+  }
+
   if (!user && !esPublica(pathname)) {
     const destino = request.nextUrl.clone();
     destino.pathname = "/login";
@@ -75,7 +83,7 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(destino);
   }
 
-  if (user && pathname === "/login") {
+  if (user && (pathname === "/login" || pathname === "/empezar")) {
     const destino = request.nextUrl.clone();
     destino.pathname = "/hoy";
     destino.search = "";

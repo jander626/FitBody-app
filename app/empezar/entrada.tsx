@@ -742,7 +742,7 @@ function Creando() {
             strokeLinecap="round"
             pathLength={1}
             strokeDasharray={1}
-            style={{ animation: "anillo 2600ms cubic-bezier(0.4, 0, 0.2, 1) both" }}
+            style={{ animation: "anillo 2600ms cubic-bezier(0.4, 0, 0.2, 1) backwards" }}
           />
         </svg>
         <div className="respira flex flex-col items-center">

@@ -317,8 +317,15 @@ button:disabled[data-pulsado],
    Todo lo que se mueve en la app sale de acá, para que se sienta de una sola
    pieza: la misma curva, duraciones parecidas, y el mismo respeto por quien
    pidió menos movimiento (el bloque de prefers-reduced-motion de arriba acorta
-   todas las animaciones a un instante, y `both` las deja en su estado final,
-   así que nada queda a medio aparecer).
+   todas las animaciones a un instante, y `backwards` deja el estado normal del
+   elemento al terminar, así que nada queda a medio aparecer).
+
+   Es `backwards` y no `both` a propósito, y no es un detalle. Con `both` el
+   elemento conserva el último fotograma —un `transform: none`— y WebKit (todo
+   iPhone) lo sigue tratando como un elemento transformado: cualquier hijo con
+   `position: fixed` deja de pegarse a la pantalla y se pega a ese elemento. Así
+   quedó la barra de modos de Registrar encima del obturador. Con `backwards`,
+   al terminar la animación el elemento vuelve a no tener transformación.
 
    Las tres ideas: lo que entra, entra escalonado (una cascada se lee como
    orden; todo a la vez, como ruido); lo que se elige confirma con un pop; y
@@ -421,21 +428,21 @@ button:disabled[data-pulsado],
 }
 
 .entra {
-  animation: entra 480ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation: entra 480ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
   animation-delay: calc(var(--i, 0) * 70ms);
 }
 .paso-adelante {
-  animation: paso-adelante 360ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation: paso-adelante 360ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
 }
 .paso-atras {
-  animation: paso-atras 360ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation: paso-atras 360ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
 }
 .pop {
-  animation: pop 320ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation: pop 320ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
 }
 .crece-x {
   transform-origin: left center;
-  animation: crece-x 800ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation: crece-x 800ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
   animation-delay: calc(var(--i, 0) * 120ms + 150ms);
 }
 .respira {
@@ -517,7 +524,7 @@ input[type="range"].rango:focus-visible::-moz-range-thumb {
   }
 }
 .llena {
-  animation: llena 1100ms cubic-bezier(0.4, 0, 0.2, 1) 150ms both;
+  animation: llena 1100ms cubic-bezier(0.4, 0, 0.2, 1) 150ms backwards;
 }
 
 /* Entre pantallas de la app: un fundido corto con un asomo de subida. Es la
@@ -534,7 +541,7 @@ input[type="range"].rango:focus-visible::-moz-range-thumb {
   }
 }
 .pagina {
-  animation: pagina 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation: pagina 260ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
 }
 
 @keyframes destello {

@@ -53,7 +53,7 @@ export function ProyeccionPeso({
           d={area}
           fill="var(--accent)"
           fillOpacity="0.12"
-          style={{ animation: "aparece 700ms ease 900ms both" }}
+          style={{ animation: "aparece 700ms ease 900ms backwards" }}
         />
         <path
           d={curva}
@@ -63,10 +63,10 @@ export function ProyeccionPeso({
           strokeLinecap="round"
           pathLength={1}
           strokeDasharray={1}
-          style={{ animation: "dibuja 1400ms cubic-bezier(0.4, 0, 0.2, 1) 200ms both" }}
+          style={{ animation: "dibuja 1400ms cubic-bezier(0.4, 0, 0.2, 1) 200ms backwards" }}
         />
         <circle cx={x0} cy={y0} r="7" fill="var(--accent)" />
-        <g style={{ animation: "pop 400ms ease 1500ms both", transformOrigin: `${x1}px ${y1}px` }}>
+        <g style={{ animation: "pop 400ms ease 1500ms backwards", transformOrigin: `${x1}px ${y1}px` }}>
           <circle cx={x1} cy={y1} r="9" fill="var(--surface)" stroke="var(--accent)" strokeWidth="4" />
         </g>
       </svg>

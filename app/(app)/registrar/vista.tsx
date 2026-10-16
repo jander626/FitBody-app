@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { CamaraFoto } from "@/components/camara-foto";
+import { useHidratado } from "@/components/hidratado";
 import type { Alimento } from "@/lib/alimentos";
 import type { MOMENTOS, Totales } from "@/lib/registro/tipos";
 import { Conversacion } from "./conversacion";
@@ -48,6 +50,7 @@ export function VistaRegistrar({
   objetivo: Totales | null;
   consumido: Totales;
 }) {
+  const hidratado = useHidratado();
   const [modo, setModo] = useState<Modo>("foto");
   // Hasta saber si hay un borrador sin guardar no se enciende la cámara: si lo
   // hay, el modo correcto es el de texto, donde está lo que se dejó a medias.
@@ -116,6 +119,13 @@ export function VistaRegistrar({
         </div>
       </div>
 
+      {/* La barra va directamente en <body>, no dentro de la pantalla: un
+          `position: fixed` dentro de un elemento animado se pega a ese elemento
+          en WebKit (iPhone) y no a la pantalla, y la barra terminaba encima del
+          obturador. Un portal la saca de ahí sin importar qué animaciones haya
+          arriba, ahora o dentro de un año. */}
+      {hidratado &&
+        createPortal(
       <nav
         aria-label="Forma de registrar"
         className="fixed inset-x-0 z-10 mx-auto max-w-md px-4"
@@ -143,7 +153,9 @@ export function VistaRegistrar({
             </button>
           ))}
         </div>
-      </nav>
+      </nav>,
+          document.body,
+        )}
     </>
   );
 }

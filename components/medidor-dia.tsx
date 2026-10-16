@@ -63,7 +63,7 @@ export function MedidorDia({
                 className="llena"
                 style={{ "--v": 0 } as React.CSSProperties}
               />
-              <g style={{ animation: "pop 400ms ease 1100ms both", transformOrigin: `${marca.x}px ${marca.y}px` }}>
+              <g style={{ animation: "pop 400ms ease 1100ms backwards", transformOrigin: `${marca.x}px ${marca.y}px` }}>
                 <circle cx={marca.x} cy={marca.y} r="8" fill="var(--surface)" stroke={color} strokeWidth="4" />
               </g>
             </>

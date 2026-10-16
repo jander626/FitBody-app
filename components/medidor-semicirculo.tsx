@@ -54,9 +54,9 @@ export function MedidorSemicirculo({
           strokeLinecap="round"
           pathLength={1}
           strokeDasharray={1}
-          style={{ animation: "dibuja 1200ms cubic-bezier(0.4, 0, 0.2, 1) 100ms both" }}
+          style={{ animation: "dibuja 1200ms cubic-bezier(0.4, 0, 0.2, 1) 100ms backwards" }}
         />
-        <g style={{ animation: "pop 400ms ease 1100ms both", transformOrigin: `${marca.x}px ${marca.y}px` }}>
+        <g style={{ animation: "pop 400ms ease 1100ms backwards", transformOrigin: `${marca.x}px ${marca.y}px` }}>
           <circle cx={marca.x} cy={marca.y} r="9" fill="var(--surface)" stroke="var(--accent)" strokeWidth="4" />
         </g>
       </svg>

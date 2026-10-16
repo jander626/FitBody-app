@@ -3,7 +3,10 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Aviso, Tarjeta, TituloSeccion, claseControl } from "@/components/ui";
+import { BarraGuardar } from "@/components/barra-guardar";
 import { EditorItems, type ItemEditable } from "@/components/editor-items";
+import { ResumenComida } from "@/components/resumen-comida";
+import { TuDia } from "@/components/tu-dia";
 import { useHidratado } from "@/components/hidratado";
 import { FotoAmpliable } from "@/components/foto-ampliable";
 import { SenalesComida } from "@/components/senales-comida";
@@ -12,7 +15,6 @@ import { comprimirFoto } from "@/lib/foto";
 import { LIMITES } from "@/lib/guardrails/limites";
 import {
   MOMENTOS,
-  NOMBRE_MOMENTO,
   momentoSugerido,
   totalesDeItems,
   type ItemBorrador,
@@ -56,6 +58,12 @@ export interface PropsRegistro {
   fotoExterna?: { archivo: File; n: number } | null;
   /** Avisa, al montar, si había algo sin guardar (para no abrir la cámara encima). */
   alRevisarBorrador?: (hayBorrador: boolean) => void;
+  /** Si este modo está a la vista (los demás siguen montados, escondidos). */
+  activo?: boolean;
+  /** Avisa si hay una comida armada, para que la pantalla cambie sus barras. */
+  alCambiarRevision?: (revisando: boolean) => void;
+  /** Se guardó una comida: la pantalla padre muestra la celebración. */
+  alGuardar?: (comida: Totales, momento: (typeof MOMENTOS)[number]) => void;
   objetivo: Totales | null;
   consumido: Totales;
 }
@@ -88,6 +96,9 @@ function Formulario({
   momentoInicial,
   fotoExterna,
   alRevisarBorrador,
+  activo = true,
+  alCambiarRevision,
+  alGuardar,
   objetivo,
   consumido,
 }: PropsRegistro) {
@@ -119,6 +130,11 @@ function Formulario({
     alRevisarBorrador?.(recuperado !== null || leerFoto() !== null);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al montar
   }, []);
+
+  const hayComida = estado.estimacion !== null && estado.items.length > 0;
+  useEffect(() => {
+    alCambiarRevision?.(hayComida);
+  }, [hayComida, alCambiarRevision]);
 
   const [error, setError] = useState<string | null>(null);
   const [fueraDeTema, setFueraDeTema] = useState<string | null>(null);
@@ -291,7 +307,8 @@ function Formulario({
       // Ya está en el diario: dejar el borrador lo convertiría en una copia
       // que resucita la próxima vez que se abra Registrar.
       limpiarBorrador();
-      router.push("/hoy");
+      if (alGuardar) alGuardar(totales, momento);
+      else router.push("/hoy");
     });
   }
 
@@ -427,37 +444,31 @@ function Formulario({
           </div>
         )}
 
-        <Tarjeta>
-          <EditorItems
-            items={items}
-            alimentos={alimentos}
-            onCambiar={(nuevos) => actualizar({ items: nuevos })}
-          />
+        <ResumenComida items={items} totales={totales} etiqueta="Creado con IA" />
 
-          {items.length === 0 && (
-            <p className="text-sm text-muted">
-              No quedó ningún ítem. Empezá de nuevo o registralo a mano.
+        <div className="mt-4">
+          <Tarjeta>
+            <EditorItems
+              items={items}
+              alimentos={alimentos}
+              onCambiar={(nuevos) => actualizar({ items: nuevos })}
+            />
+
+            {items.length === 0 && (
+              <p className="text-sm text-muted">
+                No quedó ningún ítem. Empezá de nuevo o registralo a mano.
+              </p>
+            )}
+
+            <p className="mt-2 border-t border-hairline-soft pt-2.5 text-xs text-muted">
+              {NOMBRE_CONFIANZA[estimacion.confianza]}
+              {estimacion.nota && ` · ${estimacion.nota}`}
             </p>
-          )}
-
-          <div className="mt-3 flex items-baseline justify-between border-t border-hairline-soft pt-3">
-            <span className="text-sm text-ink-2">Total</span>
-            <span className="font-mono text-sm text-ink tabular-nums">
-              {Math.round(totales.kcal)} kcal
-              <span className="text-muted">
-                {" · "}
-                {Math.round(totales.proteinaG)}P {Math.round(totales.carbsG)}C{" "}
-                {Math.round(totales.grasaG)}G
-              </span>
-            </span>
-          </div>
-
-          <p className="mt-2 text-xs text-muted">
-            {NOMBRE_CONFIANZA[estimacion.confianza]}
-            {estimacion.nota && ` · ${estimacion.nota}`}
-          </p>
-        </Tarjeta>
+          </Tarjeta>
+        </div>
       </div>
+
+      <TuDia consumido={consumido} esta={totales} objetivo={objetivo} />
 
       <SenalesComida
         comida={totales}
@@ -511,49 +522,18 @@ function Formulario({
 
       {fueraDeTema && <Aviso nivel="info">{fueraDeTema}</Aviso>}
 
-      <Tarjeta>
-        <label className="block">
-          <span className="text-sm font-medium text-ink-2">Momento</span>
-          <select
-            value={momento}
-            onChange={(e) =>
-              actualizar({
-                momento: e.target.value as (typeof MOMENTOS)[number],
-              })
-            }
-            className={claseControl}
-          >
-            {MOMENTOS.map((m) => (
-              <option key={m} value={m}>
-                {NOMBRE_MOMENTO[m]}
-              </option>
-            ))}
-          </select>
-        </label>
+      {error && <Aviso nivel="error">{error}</Aviso>}
 
-        <button
-          type="button"
-          onClick={guardar}
-          disabled={guardando || items.length === 0}
-          className="mt-3 w-full rounded-xl bg-accent px-4 py-3 text-base font-medium text-sobre-accent disabled:opacity-50"
-        >
-          {guardando ? "Guardando…" : "Guardar en el diario"}
-        </button>
-
-        <button
-          type="button"
-          onClick={empezarDeNuevo}
-          className="mt-2 w-full rounded-xl border border-hairline px-4 py-2.5 text-sm text-ink-2"
-        >
-          Empezar de nuevo
-        </button>
-
-        {error && (
-          <div className="mt-3">
-            <Aviso nivel="error">{error}</Aviso>
-          </div>
-        )}
-      </Tarjeta>
+      <BarraGuardar
+        activa={activo}
+        momento={momento}
+        onMomento={(m) => actualizar({ momento: m })}
+        kcal={totales.kcal}
+        guardando={guardando}
+        deshabilitado={items.length === 0}
+        onGuardar={guardar}
+        onDescartar={empezarDeNuevo}
+      />
     </div>
   );
 }

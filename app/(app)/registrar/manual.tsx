@@ -1,9 +1,12 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Aviso, Tarjeta, TituloSeccion, claseControl } from "@/components/ui";
+import { BarraGuardar } from "@/components/barra-guardar";
 import { EditorItems, type ItemEditable } from "@/components/editor-items";
+import { ResumenComida } from "@/components/resumen-comida";
+import { TuDia } from "@/components/tu-dia";
 import { EscanerCodigo } from "@/components/escaner-codigo";
 import { ProductoEscaneadoCard } from "@/components/producto-escaneado";
 import { SenalesComida } from "@/components/senales-comida";
@@ -16,7 +19,6 @@ import {
 } from "@/lib/alimentos";
 import {
   MOMENTOS,
-  NOMBRE_MOMENTO,
   momentoSugerido,
   totalesDeItems,
   type Totales,
@@ -30,6 +32,9 @@ export function RegistroManual({
   momentoInicial,
   modo,
   alCambiarModo,
+  activo = true,
+  alCambiarRevision,
+  alGuardar,
   objetivo,
   consumido,
 }: {
@@ -40,7 +45,13 @@ export function RegistroManual({
   /** "buscar" muestra la tabla; "codigo" abre el lector de códigos de barras. */
   modo: "buscar" | "codigo";
   /** Para salir del lector (al cerrar o al agregar un producto). */
-  alCambiarModo: (modo: "buscar") => void;
+  alCambiarModo: (modo: "buscar" | "codigo") => void;
+  /** Si este modo está a la vista (los demás siguen montados, escondidos). */
+  activo?: boolean;
+  /** Avisa si hay una comida armada, para que la pantalla cambie sus barras. */
+  alCambiarRevision?: (revisando: boolean) => void;
+  /** Se guardó una comida: la pantalla padre muestra la celebración. */
+  alGuardar?: (comida: Totales, momento: (typeof MOMENTOS)[number]) => void;
   objetivo: Totales | null;
   consumido: Totales;
 }) {
@@ -61,6 +72,11 @@ export function RegistroManual({
   );
 
   const totales = totalesDeItems(items);
+
+  const hayComida = items.length > 0;
+  useEffect(() => {
+    alCambiarRevision?.(hayComida);
+  }, [hayComida, alCambiarRevision]);
 
   function agregar(alimento: Alimento) {
     const gramos = porcionSugerida(alimento);
@@ -121,75 +137,49 @@ export function RegistroManual({
         return;
       }
       setItems([]);
-      router.push("/hoy");
+      if (alGuardar) alGuardar(totales, momento);
+      else router.push("/hoy");
     });
   }
 
   return (
     <div className="space-y-6">
       {items.length > 0 && (
-        <SenalesComida
-          comida={totales}
-          contexto={{ objetivo, consumido, momento }}
-        />
-      )}
+        <div className="space-y-4">
+          <ResumenComida items={items} totales={totales} />
 
-      {items.length > 0 && (
-        <div>
-          <TituloSeccion>Por guardar</TituloSeccion>
           <Tarjeta>
-            <EditorItems
-              items={items}
-              alimentos={alimentos}
-              onCambiar={setItems}
-            />
-
-            <div className="mt-3 flex items-baseline justify-between border-t border-hairline-soft pt-3">
-              <span className="text-sm text-ink-2">Total</span>
-              <span className="font-mono text-sm text-ink tabular-nums">
-                {Math.round(totales.kcal)} kcal
-                <span className="text-muted">
-                  {" · "}
-                  {Math.round(totales.proteinaG)}P{" "}
-                  {Math.round(totales.carbsG)}C {Math.round(totales.grasaG)}G
-                </span>
-              </span>
-            </div>
-
-            <label className="mt-3 block">
-              <span className="text-sm font-medium text-ink-2">Momento</span>
-              <select
-                value={momento}
-                onChange={(e) =>
-                  setMomento(e.target.value as (typeof MOMENTOS)[number])
-                }
-                className={claseControl}
-              >
-                {MOMENTOS.map((m) => (
-                  <option key={m} value={m}>
-                    {NOMBRE_MOMENTO[m]}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <button
-              type="button"
-              onClick={guardar}
-              disabled={guardando}
-              className="mt-3 w-full rounded-xl bg-accent px-4 py-3 text-base font-medium text-sobre-accent disabled:opacity-50"
-            >
-              {guardando ? "Guardando…" : "Guardar en el diario"}
-            </button>
-
-            {error && (
-              <div className="mt-3">
-                <Aviso nivel="error">{error}</Aviso>
-              </div>
-            )}
+            <EditorItems items={items} alimentos={alimentos} onCambiar={setItems} />
           </Tarjeta>
+
+          <TuDia consumido={consumido} esta={totales} objetivo={objetivo} />
+
+          <SenalesComida comida={totales} contexto={{ objetivo, consumido, momento }} />
+
+          {/* La barra de modos se esconde mientras hay una comida armada: desde
+              aquí se sigue agregando sin salir. */}
+          <button
+            type="button"
+            onClick={() => alCambiarModo("codigo")}
+            className="flex w-full items-center justify-center gap-2 rounded-full bg-hairline-soft py-3 text-sm font-medium text-ink-2"
+          >
+            Escanear otro producto
+          </button>
+
+          {error && <Aviso nivel="error">{error}</Aviso>}
         </div>
       )}
+
+      <BarraGuardar
+        activa={activo && items.length > 0}
+        momento={momento}
+        onMomento={setMomento}
+        kcal={totales.kcal}
+        guardando={guardando}
+        deshabilitado={items.length === 0}
+        onGuardar={guardar}
+        onDescartar={() => setItems([])}
+      />
 
       {modo === "codigo" && (
         <div>

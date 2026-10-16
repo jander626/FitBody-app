@@ -25,10 +25,17 @@ export function MedidorDia({
   consumido,
   objetivo,
   macros,
+  anterior,
 }: {
   consumido: number;
   objetivo: number;
   macros: Macro[];
+  /**
+   * Lo consumido antes de lo último que se sumó. Con esto el arco muestra ese
+   * tramo ya lleno y dibuja solo el nuevo, que es lo que hace sentir cuánto
+   * aportó la comida que se acaba de registrar.
+   */
+  anterior?: number;
 }) {
   const restante = objetivo - consumido;
   const excedido = consumido > objetivo * 1.05;
@@ -37,6 +44,8 @@ export function MedidorDia({
   const estado: EstadoMedidor = excedido ? "excedido" : "progreso";
   const color = colorMedidor(estado);
   const marca = puntoEnArco(fraccion);
+  const fraccionAntes =
+    anterior !== undefined && objetivo > 0 ? Math.min(fraccion, Math.max(0, anterior / objetivo)) : 0;
 
   return (
     <div>
@@ -50,10 +59,13 @@ export function MedidorDia({
       >
         <svg viewBox="0 -10 200 120" className="w-full" aria-hidden="true">
           <path d={trazoArco(0, 1)} fill="none" stroke={color} strokeOpacity="0.16" strokeWidth="12" strokeLinecap="round" />
+          {fraccionAntes > 0.005 && (
+            <path d={trazoArco(0, fraccionAntes)} fill="none" stroke={color} strokeWidth="12" strokeLinecap="round" />
+          )}
           {fraccion > 0.005 && (
             <>
               <path
-                d={trazoArco(0, fraccion)}
+                d={trazoArco(fraccionAntes, fraccion)}
                 fill="none"
                 stroke={color}
                 strokeWidth="12"

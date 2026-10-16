@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
+import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { CamaraFoto } from "@/components/camara-foto";
 import { useHidratado } from "@/components/hidratado";
+import { PantallaRegistrada } from "@/components/pantalla-registrada";
 import type { Alimento } from "@/lib/alimentos";
 import type { MOMENTOS, Totales } from "@/lib/registro/tipos";
 import { Conversacion } from "./conversacion";
@@ -41,6 +43,11 @@ export function VistaRegistrar({
   momentoInicial,
   objetivo,
   consumido,
+  hoy,
+  semana,
+  registrados,
+  racha,
+  yaRegistradoHoy,
 }: {
   alimentos: Alimento[];
   fecha: string;
@@ -49,13 +56,28 @@ export function VistaRegistrar({
   momentoInicial?: (typeof MOMENTOS)[number];
   objetivo: Totales | null;
   consumido: Totales;
+  /** Para la celebración de después de guardar. */
+  hoy: string;
+  semana: string[];
+  registrados: string[];
+  racha: number;
+  yaRegistradoHoy: boolean;
 }) {
+  const router = useRouter();
   const hidratado = useHidratado();
   const [modo, setModo] = useState<Modo>("foto");
   // Hasta saber si hay un borrador sin guardar no se enciende la cámara: si lo
   // hay, el modo correcto es el de texto, donde está lo que se dejó a medias.
   const [revisado, setRevisado] = useState(false);
   const [foto, setFoto] = useState<{ archivo: File; n: number } | null>(null);
+  // Si hay una comida armada, la barra de guardar ocupa el lugar de la de modos.
+  const [revisando, setRevisando] = useState({ texto: false, manual: false });
+  const [guardada, setGuardada] = useState<Totales | null>(null);
+  const revisaTexto = useCallback((v: boolean) => setRevisando((p) => ({ ...p, texto: v })), []);
+  const revisaManual = useCallback((v: boolean) => setRevisando((p) => ({ ...p, manual: v })), []);
+  const alGuardar = useCallback((comida: Totales) => setGuardada(comida), []);
+
+  const barraDeModos = !(modo === "texto" ? revisando.texto : modo === "buscar" || modo === "codigo" ? revisando.manual : false);
 
   const indice = MODOS.findIndex((m) => m.id === modo);
   const actual = MODOS[indice];
@@ -101,6 +123,9 @@ export function VistaRegistrar({
               if (hay) setModo("texto");
               setRevisado(true);
             }}
+            activo={modo === "texto"}
+            alCambiarRevision={revisaTexto}
+            alGuardar={alGuardar}
             objetivo={objetivo}
             consumido={consumido}
           />
@@ -113,6 +138,9 @@ export function VistaRegistrar({
             momentoInicial={momentoInicial}
             modo={modo === "codigo" ? "codigo" : "buscar"}
             alCambiarModo={setModo}
+            activo={modo === "buscar" || modo === "codigo"}
+            alCambiarRevision={revisaManual}
+            alGuardar={alGuardar}
             objetivo={objetivo}
             consumido={consumido}
           />
@@ -125,6 +153,7 @@ export function VistaRegistrar({
           obturador. Un portal la saca de ahí sin importar qué animaciones haya
           arriba, ahora o dentro de un año. */}
       {hidratado &&
+        barraDeModos &&
         createPortal(
       <nav
         aria-label="Forma de registrar"
@@ -156,6 +185,25 @@ export function VistaRegistrar({
       </nav>,
           document.body,
         )}
+
+      {guardada && (
+        <PantallaRegistrada
+          primeraDelDia={!yaRegistradoHoy}
+          racha={racha}
+          semana={semana}
+          registrados={registrados}
+          hoy={hoy}
+          antes={consumido}
+          despues={{
+            kcal: consumido.kcal + guardada.kcal,
+            proteinaG: consumido.proteinaG + guardada.proteinaG,
+            carbsG: consumido.carbsG + guardada.carbsG,
+            grasaG: consumido.grasaG + guardada.grasaG,
+          }}
+          objetivo={objetivo}
+          onContinuar={() => router.push("/hoy")}
+        />
+      )}
     </>
   );
 }

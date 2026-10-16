@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { listarAlimentos } from "@/lib/datos/alimentos";
-import { fechaDeHoy, obtenerDia } from "@/lib/datos/diario";
+import { diasConRegistro, fechaDeHoy, obtenerDia } from "@/lib/datos/diario";
+import { haceDias, racha } from "@/lib/racha";
+import { semanaDe } from "@/lib/semana";
 import { MOMENTOS } from "@/lib/registro/tipos";
 import { usuarioActual } from "@/lib/supabase/cliente-servidor";
 import { VistaRegistrar } from "./vista";
@@ -18,11 +20,15 @@ export default async function Registrar(props: PageProps<"/registrar">) {
       : undefined;
 
   const fecha = await fechaDeHoy();
-  const [alimentos, dia] = await Promise.all([
+  const semana = semanaDe(fecha);
+  const [alimentos, dia, registrados, recientes] = await Promise.all([
     listarAlimentos(),
     // Hace falta para decir cómo encaja la comida: sin lo que ya llevás del
     // día, "500 kcal" no significa nada.
     obtenerDia(usuario.id, fecha),
+    // Para la celebración de después de guardar: la semana y la racha.
+    diasConRegistro(usuario.id, semana),
+    diasConRegistro(usuario.id, [haceDias(fecha, 60), fecha]),
   ]);
 
   return (
@@ -33,6 +39,11 @@ export default async function Registrar(props: PageProps<"/registrar">) {
       momentoInicial={momentoInicial}
       objetivo={dia.objetivo}
       consumido={dia.totales}
+      hoy={fecha}
+      semana={semana}
+      registrados={registrados}
+      racha={racha(recientes, fecha)}
+      yaRegistradoHoy={dia.comidas.length > 0}
     />
   );
 }

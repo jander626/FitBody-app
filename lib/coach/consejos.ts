@@ -40,6 +40,8 @@ export interface MetricaConsejo {
 }
 
 export interface EntradaConsejos {
+  /** Qué día es hoy para quien mira, AAAA-MM-DD. La ventana termina ahí. */
+  hoy: string;
   dias: DiaConsejo[];
   metricas: MetricaConsejo[];
   objetivo: { kcal: number; proteinaG: number } | null;
@@ -81,12 +83,24 @@ function r0(n: number): number {
   return Math.round(n);
 }
 
-function ultimos<T extends { fecha: string }>(filas: T[], dias: number): T[] {
-  if (filas.length === 0) return [];
-  const ordenados = [...filas].sort((a, b) => a.fecha.localeCompare(b.fecha));
-  const fin = Date.parse(`${ordenados[ordenados.length - 1].fecha}T00:00:00Z`);
+/**
+ * Las filas de los `dias` días que terminan en `hoy`.
+ *
+ * La ventana cuelga de hoy y no del último registro: si se ancla al último,
+ * un mes sin registrar sigue mostrando "2 de 8 días" con datos de hace un mes,
+ * y el consejo habla de una semana que ya pasó.
+ */
+export function ultimos<T extends { fecha: string }>(
+  filas: T[],
+  dias: number,
+  hoy: string,
+): T[] {
+  const fin = Date.parse(`${hoy}T00:00:00Z`);
   const corte = fin - (dias - 1) * DIA_MS;
-  return ordenados.filter((f) => Date.parse(`${f.fecha}T00:00:00Z`) >= corte);
+  return filas.filter((f) => {
+    const t = Date.parse(`${f.fecha}T00:00:00Z`);
+    return t >= corte && t <= fin;
+  });
 }
 
 /**
@@ -98,8 +112,8 @@ function ultimos<T extends { fecha: string }>(filas: T[], dias: number): T[] {
  */
 export function generarConsejos(entrada: EntradaConsejos): Consejo[] {
   const { objetivo, gastoEstimado } = entrada;
-  const dias = ultimos(entrada.dias, VENTANA_DIAS).filter((d) => d.comidas > 0);
-  const metricas = ultimos(entrada.metricas, VENTANA_DIAS);
+  const dias = ultimos(entrada.dias, VENTANA_DIAS, entrada.hoy).filter((d) => d.comidas > 0);
+  const metricas = ultimos(entrada.metricas, VENTANA_DIAS, entrada.hoy);
 
   const consejos: Consejo[] = [];
 

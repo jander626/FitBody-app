@@ -1,6 +1,12 @@
 import "server-only";
 
-import { generarConsejos, type Consejo } from "@/lib/coach/consejos";
+import {
+  VENTANA_DIAS,
+  generarConsejos,
+  ultimos,
+  type Consejo,
+} from "@/lib/coach/consejos";
+import { fechaDeHoy } from "./diario";
 import { obtenerHistorial } from "./historial";
 import { obtenerMetricas } from "./metricas";
 
@@ -21,12 +27,14 @@ export interface EstadoConsejos {
  * puro y está testeado.
  */
 export async function obtenerConsejos(userId: string): Promise<EstadoConsejos> {
-  const [historial, metricas] = await Promise.all([
+  const [hoy, historial, metricas] = await Promise.all([
+    fechaDeHoy(),
     obtenerHistorial(userId),
     obtenerMetricas(userId),
   ]);
 
   const consejos = generarConsejos({
+    hoy,
     dias: historial.dias,
     metricas,
     objetivo: historial.objetivo
@@ -40,7 +48,9 @@ export async function obtenerConsejos(userId: string): Promise<EstadoConsejos> {
 
   return {
     consejos,
-    diasAnalizados: historial.dias.filter((d) => d.comidas > 0).length,
+    diasAnalizados: ultimos(historial.dias, VENTANA_DIAS, hoy).filter(
+      (d) => d.comidas > 0,
+    ).length,
     hayObjetivo: historial.objetivo !== null,
   };
 }

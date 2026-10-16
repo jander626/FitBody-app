@@ -17,7 +17,8 @@ import {
 
 const OBJETIVO = { kcal: 1850, proteinaG: 160 };
 const DIA_MS = 86_400_000;
-const FIN = Date.parse("2026-08-30T00:00:00Z");
+const HOY = "2026-08-30";
+const FIN = Date.parse(`${HOY}T00:00:00Z`);
 
 function fechas(n: number): string[] {
   return Array.from({ length: n }, (_, i) =>
@@ -42,6 +43,7 @@ function dias(n: number, cambios: Partial<DiaConsejo> = {}): DiaConsejo[] {
 
 function entrada(over: Partial<EntradaConsejos> = {}): EntradaConsejos {
   return {
+    hoy: HOY,
     dias: dias(7),
     metricas: [],
     objetivo: OBJETIVO,
@@ -51,6 +53,19 @@ function entrada(over: Partial<EntradaConsejos> = {}): EntradaConsejos {
 }
 
 const ids = (cs: { id: string }[]) => cs.map((c) => c.id);
+
+describe("la ventana cuelga de hoy", () => {
+  it("un mes sin registrar no deja datos viejos como si fueran de esta semana", () => {
+    const cs = generarConsejos(entrada({ dias: dias(7), hoy: "2026-10-16" }));
+    expect(ids(cs)).toEqual(["pocos-datos"]);
+    expect(cs[0].evidencia).toEqual(["0 de 8 días con registro"]);
+  });
+
+  it("ignora registros con fecha posterior a hoy", () => {
+    const cs = generarConsejos(entrada({ dias: dias(7), hoy: "2026-08-24" }));
+    expect(cs[0].evidencia[0]).toMatch(/^\d de 8 días con registro$/);
+  });
+});
 
 describe("cuándo se calla", () => {
   it("con pocos días no opina de nada más", () => {

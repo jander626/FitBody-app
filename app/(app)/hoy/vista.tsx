@@ -125,6 +125,7 @@ export function VistaHoy({
               objetivo={objetivo.proteinaG}
               unidad="g"
               minimo
+              tono="var(--macro-prot)"
               estado={estadoMacro(totales.proteinaG, objetivo.proteinaG, true)}
             />
             <Medidor
@@ -132,6 +133,7 @@ export function VistaHoy({
               valor={totales.carbsG}
               objetivo={objetivo.carbsG}
               unidad="g"
+              tono="var(--macro-carb)"
               estado={estadoMacro(totales.carbsG, objetivo.carbsG, false)}
             />
             <Medidor
@@ -139,6 +141,7 @@ export function VistaHoy({
               valor={totales.grasaG}
               objetivo={objetivo.grasaG}
               unidad="g"
+              tono="var(--macro-gras)"
               estado={estadoMacro(totales.grasaG, objetivo.grasaG, false)}
             />
             <p className="mt-2 text-xs text-muted">

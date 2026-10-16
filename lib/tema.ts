@@ -19,8 +19,8 @@ export const CLAVE_TEMA = "fitfood-tema";
 
 /** El color de la barra de estado, por tema. Debe seguir a --ground. */
 export const COLOR_BARRA = {
-  claro: "#f5f5f3",
-  oscuro: "#131417",
+  claro: "#f6f4ee",
+  oscuro: "#0f1512",
 } as const;
 
 export function esTema(valor: string | null): valor is Tema {

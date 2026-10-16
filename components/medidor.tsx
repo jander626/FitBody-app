@@ -27,6 +27,8 @@ export function Medidor({
   estado,
   /** Cuando el objetivo es un mínimo (proteína) y no un techo. */
   minimo = false,
+  /** Color propio mientras avanza, p. ej. `var(--macro-prot)`. Por defecto, el acento. */
+  tono,
 }: {
   etiqueta: string;
   valor: number;
@@ -34,6 +36,7 @@ export function Medidor({
   unidad: string;
   estado: EstadoMedidor;
   minimo?: boolean;
+  tono?: string;
 }) {
   const pct = objetivo > 0 ? (valor / objetivo) * 100 : 0;
   const relleno = Math.min(100, Math.max(0, pct));
@@ -43,7 +46,9 @@ export function Medidor({
   // bien". Entre el 100 y el 105 % la barra simplemente se ve llena, que es lo
   // que corresponde a estar justo en el límite.
   const excedido = estado === "excedido";
-  const color = COLOR[estado];
+  // El tono solo manda mientras avanza: lograrlo o pasarse tiene su propio
+  // color, que no puede depender del macro.
+  const color = estado === "progreso" && tono ? tono : COLOR[estado];
 
   return (
     <div className="py-1.5">

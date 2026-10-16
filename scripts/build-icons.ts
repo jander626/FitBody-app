@@ -31,7 +31,7 @@ async function main() {
         bottom: relleno,
         left: relleno,
         right: relleno,
-        background: "#C77A1E",
+        background: "#047857",
       })
       .png()
       .toBuffer();

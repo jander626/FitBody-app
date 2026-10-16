@@ -479,33 +479,33 @@ export interface Database {
           user_id: string;
           fecha: string;
           peso_kg: number;
-          cintura_cm: number | null;
           condiciones: string | null;
           nota: string | null;
           creado_en: string;
           actualizado_en: string;
+          cintura_cm: number | null;
         };
         Insert: {
           id?: string;
           user_id: string;
           fecha: string;
           peso_kg: number;
-          cintura_cm?: number | null;
           condiciones?: string | null;
           nota?: string | null;
           creado_en?: string;
           actualizado_en?: string;
+          cintura_cm?: number | null;
         };
         Update: {
           id?: string;
           user_id?: string;
           fecha?: string;
           peso_kg?: number;
-          cintura_cm?: number | null;
           condiciones?: string | null;
           nota?: string | null;
           creado_en?: string;
           actualizado_en?: string;
+          cintura_cm?: number | null;
         };
         Relationships: [
           {

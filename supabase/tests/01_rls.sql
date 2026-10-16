@@ -69,8 +69,14 @@ begin
   assert peso = 78.9, format('Ana ve el peso equivocado: %s', peso);
 
   -- El alimento semilla lo ve todo el mundo.
-  select count(*) into n from public.foods where publico;
-  assert n = 1, format('Ana deberia ver 1 alimento publico, ve %s', n);
+  -- Se mira el del test, no el total: las migraciones ya traen alimentos
+  -- publicos de semilla (0005) y contarlos todos haria fallar esto al agregar
+  -- uno.
+  select count(*) into n from public.foods where slug = 'arepa-media-tela';
+  assert n = 1, format('Ana deberia ver el alimento publico del test, ve %s', n);
+
+  select count(*) into n from public.foods where not publico;
+  assert n = 0, format('Ana ve %s alimentos privados que no son suyos', n);
 
   select count(*) into n from public.daily_metrics;
   assert n = 1, format('Ana deberia ver 1 dia de metricas, ve %s', n);

@@ -146,7 +146,10 @@ lineas.push(`
 do $$
 declare n integer; suma numeric; declarado numeric;
 begin
-  select count(*) into n from public.foods;
+  -- Los de la bitacora, no el total: las migraciones ya traen alimentos
+  -- publicos de semilla (0005) que no vienen de la bitacora.
+  select count(*) into n from public.foods
+    where slug = any (array[${bitacora.foods.map((f) => `'${f.slug}'`).join(", ")}]);
   assert n = ${bitacora.foods.length}, format('alimentos: %s != ${bitacora.foods.length}', n);
 
   select count(*) into n from public.weight_logs;

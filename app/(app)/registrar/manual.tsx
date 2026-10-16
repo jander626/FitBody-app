@@ -4,7 +4,10 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Aviso, Tarjeta, TituloSeccion, claseControl } from "@/components/ui";
 import { EditorItems, type ItemEditable } from "@/components/editor-items";
+import { EscanerCodigo } from "@/components/escaner-codigo";
+import { ProductoEscaneadoCard } from "@/components/producto-escaneado";
 import { SenalesComida } from "@/components/senales-comida";
+import type { ProductoEscaneado } from "@/lib/barcode/openfoodfacts";
 import {
   buscarAlimentos,
   macrosDePorcion,
@@ -39,6 +42,8 @@ export function RegistroManual({
   );
   const [items, setItems] = useState<ItemEditable[]>([]);
   const [error, setError] = useState<string | null>(null);
+  // null = cerrado; sin código = cámara abierta; con código = ya se leyó uno.
+  const [escaner, setEscaner] = useState<{ codigo: string | null } | null>(null);
   const [guardando, iniciarGuardado] = useTransition();
 
   const resultados = useMemo(
@@ -63,6 +68,26 @@ export function RegistroManual({
       },
     ]);
     setConsulta("");
+  }
+
+  function agregarProducto(producto: ProductoEscaneado, gramos: number) {
+    setItems((previos) => [
+      ...previos,
+      {
+        clave: `${producto.codigo}-${Date.now()}`,
+        // Sin enlace a la tabla: el producto no es un alimento propio, y así
+        // cambiar la porción reescala lo que ya está calculado.
+        foodId: null,
+        alimento: producto.marca
+          ? `${producto.nombre} (${producto.marca})`
+          : producto.nombre,
+        porcionG: gramos,
+        porcionMl: null,
+        nota: `Código de barras ${producto.codigo}`,
+        ...macrosDePorcion(producto, gramos),
+      },
+    ]);
+    setEscaner(null);
   }
 
   function guardar() {
@@ -154,6 +179,34 @@ export function RegistroManual({
           </Tarjeta>
         </div>
       )}
+
+      <div>
+        <TituloSeccion>Producto empacado</TituloSeccion>
+        {escaner === null ? (
+          <button
+            type="button"
+            onClick={() => setEscaner({ codigo: null })}
+            className="w-full rounded-xl border border-hairline bg-surface px-4 py-3 text-sm text-ink"
+          >
+            Escanear código de barras
+          </button>
+        ) : (
+          <Tarjeta>
+            {escaner.codigo === null ? (
+              <EscanerCodigo
+                onCodigo={(codigo) => setEscaner({ codigo })}
+                onCerrar={() => setEscaner(null)}
+              />
+            ) : (
+              <ProductoEscaneadoCard
+                codigo={escaner.codigo}
+                onAgregar={agregarProducto}
+                onCancelar={() => setEscaner(null)}
+              />
+            )}
+          </Tarjeta>
+        )}
+      </div>
 
       <div>
         <TituloSeccion>Buscar en la tabla</TituloSeccion>

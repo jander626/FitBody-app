@@ -43,6 +43,8 @@ Hace falta un proyecto de Supabase (plan gratis alcanza):
 
 1. Crear el proyecto y copiar `URL` y `anon key` a `.env.local`.
 2. Aplicar las migraciones de `supabase/migrations/` en el SQL Editor, en orden.
+   La `0005` agrega ~100 alimentos colombianos y la `0006` la columna de cintura;
+   ambas son idempotentes, así que se pueden correr en un proyecto que ya existe.
 3. Entrar a `/login` y pedir el magic link.
 
 Para arrancar con los datos reales en vez de en cero:

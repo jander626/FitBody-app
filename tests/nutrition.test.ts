@@ -314,3 +314,31 @@ describe("ajuste semanal", () => {
     expect(r.kcalPropuesto).toBe(1850);
   });
 });
+
+
+import { repartoConservando } from "@/lib/nutrition";
+
+describe("repartoConservando", () => {
+  it("conserva proteína y grasa y deja que los carbohidratos absorban el cambio", () => {
+    const r = repartoConservando({ proteinaG: 160, grasaG: 70 }, 1650);
+    expect(r.proteinaG).toBe(160);
+    expect(r.grasaG).toBe(70);
+    expect(r.carbsG).toBe(Math.round((1650 - 640 - 630) / 4));
+  });
+
+  it("si la grasa no cabe, se recorta antes que la proteína", () => {
+    const r = repartoConservando({ proteinaG: 200, grasaG: 150 }, 1500);
+    expect(r.proteinaG).toBe(200);
+    expect(r.grasaG).toBeLessThan(150);
+    // La grasa recortada ocupa casi todo lo que queda: sobran unos pocos gramos
+    // de carbohidratos por el redondeo.
+    expect(r.carbsG).toBeLessThanOrEqual(2);
+    expect(Math.abs(r.proteinaG * 4 + r.carbsG * 4 + r.grasaG * 9 - 1500)).toBeLessThanOrEqual(10);
+  });
+
+  it("nunca devuelve gramos negativos", () => {
+    const r = repartoConservando({ proteinaG: 400, grasaG: 100 }, 1200);
+    expect(r.carbsG).toBeGreaterThanOrEqual(0);
+    expect(r.grasaG).toBeGreaterThanOrEqual(0);
+  });
+});

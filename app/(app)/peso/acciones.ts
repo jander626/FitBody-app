@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { PISO_KCAL, macros, type Sexo } from "@/lib/nutrition";
+import { PISO_KCAL, repartoConservando, type Sexo } from "@/lib/nutrition";
 import { clienteServidor } from "@/lib/supabase/cliente-servidor";
 
 export type Resultado =
@@ -107,7 +107,7 @@ export async function aceptarAjuste(kcalPropuesto: number): Promise<Resultado> {
     supabase
       .from("user_goals")
       .select(
-        "objetivo, peso_meta_kg, factor_actividad, deficit_pct, kcal",
+        "objetivo, peso_meta_kg, factor_actividad, deficit_pct, kcal, proteina_g, grasa_g",
       )
       .eq("user_id", user.id)
       .eq("activo", true)
@@ -147,7 +147,13 @@ export async function aceptarAjuste(kcalPropuesto: number): Promise<Resultado> {
     };
   }
 
-  const reparto = macros(pesoKg, kcalPropuesto);
+  // Se conservan la proteína y la grasa del plan vigente: son la forma de
+  // comer que la persona eligió, y recalcularlas con valores por defecto la
+  // cambiaría sin avisar.
+  const reparto = repartoConservando(
+    { proteinaG: objetivo.proteina_g, grasaG: objetivo.grasa_g },
+    kcalPropuesto,
+  );
 
   const { error: errDesactivar } = await supabase
     .from("user_goals")

@@ -49,7 +49,17 @@ export interface OpcionesPlan {
    * mínimo fisiológico está muy por debajo, en 0.6 g/kg.
    */
   grasaGPorKg?: number;
+  /**
+   * Fracción de las calorías que van a carbohidratos (0 a 1). Si se da, manda
+   * sobre el reparto "lo que sobre": los carbohidratos se fijan en ese
+   * porcentaje y la grasa se lleva el resto. Es lo que hace bajas en
+   * carbohidratos a las dietas baja en carbohidratos y keto.
+   */
+  carbsPct?: number;
 }
+
+/** Los dos diales que toda meta define: proteína y grasa por kg. */
+export type DialesBase = Required<Pick<OpcionesPlan, "proteinaGPorKg" | "grasaGPorKg">>;
 
 export interface RegistroPeso {
   /** ISO 8601, AAAA-MM-DD. */

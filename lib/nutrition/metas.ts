@@ -11,7 +11,7 @@
  *
  * Módulo puro. Ni red ni base.
  */
-import type { Objetivo, OpcionesPlan } from "./tipos";
+import type { DialesBase, Objetivo } from "./tipos";
 
 // ------------------------------------------------------------------ metas ---
 
@@ -28,7 +28,7 @@ export interface DefinicionMeta {
   objetivo: Objetivo;
   /** Déficit por defecto, en % del gasto. Negativo = superávit. */
   deficitPct: number;
-  opciones: Required<OpcionesPlan>;
+  opciones: DialesBase;
   /** Si tiene sentido preguntar por el ritmo. */
   preguntaRitmo: boolean;
 }
@@ -222,7 +222,7 @@ export interface Parametros {
   objetivo: Objetivo;
   factorActividad: number;
   deficitPct: number;
-  opciones: Required<OpcionesPlan>;
+  opciones: DialesBase;
 }
 
 // ------------------------------------------------------------ de vuelta ---

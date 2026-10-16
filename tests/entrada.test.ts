@@ -95,3 +95,56 @@ describe("semanasHastaMeta", () => {
     expect(semanasHastaMeta(120, 60, { min: -0.2, max: -0.1 })).toBeNull();
   });
 });
+
+describe("dieta y fuerza", () => {
+  const kcalDe = (m: { proteinaG: number; carbsG: number; grasaG: number }) =>
+    m.proteinaG * 4 + m.carbsG * 4 + m.grasaG * 9;
+
+  it("sin dieta ni fuerza todo queda como antes", () => {
+    const a = planDeEntrada(BASE).calculo;
+    const b = planDeEntrada({ ...BASE, dieta: "recomendada", fuerza: true }).calculo;
+    expect([b.proteinaG, b.carbsG, b.grasaG]).toEqual([a.proteinaG, a.carbsG, a.grasaG]);
+  });
+
+  it("alta en proteína sube la proteína y baja la grasa", () => {
+    const base = planDeEntrada(BASE).calculo;
+    const alta = planDeEntrada({ ...BASE, dieta: "alta_proteina" }).calculo;
+    expect(alta.proteinaG).toBeGreaterThan(base.proteinaG);
+    expect(alta.grasaG).toBeLessThan(base.grasaG);
+  });
+
+  it("baja en carbohidratos y keto reducen los carbohidratos, keto más", () => {
+    const base = planDeEntrada(BASE).calculo;
+    const baja = planDeEntrada({ ...BASE, dieta: "baja_carbs" }).calculo;
+    const keto = planDeEntrada({ ...BASE, dieta: "keto" }).calculo;
+    expect(baja.carbsG).toBeLessThan(base.carbsG);
+    expect(keto.carbsG).toBeLessThan(baja.carbsG);
+    expect(keto.carbsG).toBeLessThanOrEqual(30);
+    expect(keto.grasaG).toBeGreaterThan(baja.grasaG);
+  });
+
+  it("baja en grasas usa el mínimo fisiológico", () => {
+    const r = planDeEntrada({ ...BASE, dieta: "baja_grasa" }).calculo;
+    expect(r.grasaG).toBe(Math.round((BASE.pesoKg * 0.6) / 5) * 5);
+  });
+
+  it("sin entrenar fuerza baja la proteína, sin pasar del piso de 1,4 g/kg", () => {
+    const con = planDeEntrada({ ...BASE, fuerza: true }).calculo;
+    const sin = planDeEntrada({ ...BASE, fuerza: false }).calculo;
+    expect(sin.proteinaG).toBeLessThan(con.proteinaG);
+    expect(sin.proteinaG).toBeGreaterThanOrEqual(BASE.pesoKg * 1.4 - 5);
+  });
+
+  it("cada dieta reparte las mismas calorías: los macros suman el objetivo", () => {
+    for (const dieta of ["recomendada", "alta_proteina", "baja_carbs", "keto", "baja_grasa"] as const) {
+      const { calculo } = planDeEntrada({ ...BASE, dieta });
+      expect(Math.abs(kcalDe(calculo) - calculo.kcalObjetivo), dieta).toBeLessThanOrEqual(45);
+    }
+  });
+
+  it("el esquema acepta dietas conocidas y rechaza las inventadas", () => {
+    expect(entradaDeMetadata({ ...BASE, dieta: "keto", fuerza: false })).not.toBeNull();
+    expect(entradaDeMetadata({ ...BASE, dieta: "carnivora" })).toBeNull();
+    expect(entradaDeMetadata({ ...BASE, fuerza: "si" })).toBeNull();
+  });
+});

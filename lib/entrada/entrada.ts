@@ -17,6 +17,7 @@ import {
   parametrosDe,
   type Parametros,
 } from "@/lib/nutrition/metas";
+import { DIETAS, proteinaSegunFuerza } from "./dietas";
 
 /** Debajo de esto no se arma un plan: la app no está pensada para menores. */
 export const EDAD_MINIMA = 18;
@@ -36,6 +37,10 @@ export const EntradaSchema = z.object({
   estaturaCm: z.number().min(100).max(250),
   pesoKg: z.number().min(20).max(400),
   pesoMetaKg: z.number().min(20).max(400).optional(),
+  /** Sin esto se asume la recomendada: lo anterior a esta pregunta. */
+  dieta: z.enum(["recomendada", "alta_proteina", "baja_carbs", "keto", "baja_grasa"]).optional(),
+  /** ¿Entrena fuerza? Sin respuesta se asume que sí, como antes de la pregunta. */
+  fuerza: z.boolean().optional(),
 });
 
 export type Entrada = z.infer<typeof EntradaSchema>;
@@ -69,6 +74,14 @@ export function planDeEntrada(entrada: Entrada): PlanDeEntrada {
     ...(entrada.ritmo ? { ritmo: entrada.ritmo } : {}),
   });
 
+  // Primero la fuerza (cuánta proteína hace falta), después la dieta (de dónde
+  // salen el resto de las calorías).
+  const base = {
+    ...parametros.opciones,
+    proteinaGPorKg: proteinaSegunFuerza(parametros.opciones.proteinaGPorKg, entrada.fuerza),
+  };
+  const opciones = DIETAS[entrada.dieta ?? "recomendada"].opciones(base);
+
   const calculo = calcularPlan(
     {
       sexo: entrada.sexo,
@@ -79,7 +92,7 @@ export function planDeEntrada(entrada: Entrada): PlanDeEntrada {
     parametros.factorActividad,
     parametros.objetivo,
     parametros.deficitPct,
-    parametros.opciones,
+    opciones,
   );
 
   return { parametros, calculo, rango: rangoDeCalorias(calculo.kcalObjetivo) };

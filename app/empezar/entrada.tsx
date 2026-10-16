@@ -7,6 +7,7 @@ import { MedidorSemicirculo } from "@/components/medidor-semicirculo";
 import { Confeti, useCuenta } from "@/components/movimiento";
 import { ProyeccionPeso } from "@/components/proyeccion-peso";
 import { SelectorNumero } from "@/components/selector-numero";
+import { DIETAS, ORDEN_DIETAS, type Dieta } from "@/lib/entrada/dietas";
 import { clienteNavegador } from "@/lib/supabase/cliente-navegador";
 import {
   EntradaSchema,
@@ -58,6 +59,8 @@ type Paso =
   | "peso"
   | "pesoMeta"
   | "salud"
+  | "dieta"
+  | "fuerza"
   | "creando"
   | "plan"
   | "proyeccion"
@@ -74,6 +77,8 @@ const PREGUNTAS: Paso[] = [
   "peso",
   "pesoMeta",
   "salud",
+  "dieta",
+  "fuerza",
 ];
 
 const CLAVE_BORRADOR = "fitfood-entrada-v2";
@@ -116,6 +121,9 @@ interface Borrador {
   /** Null = sin peso objetivo (lo omitió o no aplica). */
   pesoMeta: number | null;
   condicion: boolean | null;
+  dieta: Dieta;
+  /** ¿Entrena fuerza? Null = aún no contestó. */
+  fuerza: boolean | null;
 }
 
 const VACIO: Borrador = {
@@ -128,6 +136,8 @@ const VACIO: Borrador = {
   peso: 70,
   pesoMeta: null,
   condicion: null,
+  dieta: "recomendada",
+  fuerza: null,
 };
 
 function leerBorrador(): Borrador {
@@ -190,6 +200,10 @@ export function Entrada() {
       estaturaCm: b.estatura,
       pesoKg: b.peso,
       ...(b.pesoMeta !== null && preguntaPesoMeta(b.meta) ? { pesoMetaKg: b.pesoMeta } : {}),
+      // Con una condición de salud solo se ofrece la forma recomendada: keto o
+      // alta en proteína no son para cualquiera.
+      dieta: b.condicion ? "recomendada" : b.dieta,
+      ...(b.fuerza !== null ? { fuerza: b.fuerza } : {}),
     });
     return analisis.success ? analisis.data : null;
   }, [b]);
@@ -215,12 +229,14 @@ export function Entrada() {
       "peso",
       ...(b.meta && preguntaPesoMeta(b.meta) ? (["pesoMeta"] as Paso[]) : []),
       "salud",
+      ...(b.condicion ? [] : (["dieta"] as Paso[])),
+      "fuerza",
       "creando",
       "plan",
       ...(semanas !== null ? (["proyeccion"] as Paso[]) : []),
       "cuenta",
     ],
-    [b.meta, semanas],
+    [b.meta, b.condicion, semanas],
   );
   const indice = pasos.indexOf(paso);
 
@@ -438,10 +454,39 @@ export function Entrada() {
             titulo="¿Tienes alguna condición de salud?"
             ayuda="Embarazo o lactancia, diabetes, enfermedad renal o cardiaca, o antecedentes de trastornos de la conducta alimentaria."
           >
-            <Opcion i={0} emoji="⚕️" titulo="Sí" elegida={b.condicion === true} onElegir={() => elegir({ condicion: true }, "creando")} />
-            <Opcion i={1} emoji="✅" titulo="No" elegida={b.condicion === false} onElegir={() => elegir({ condicion: false }, "creando")} />
+            <Opcion i={0} emoji="⚕️" titulo="Sí" elegida={b.condicion === true} onElegir={() => elegir({ condicion: true }, "fuerza")} />
+            <Opcion i={1} emoji="✅" titulo="No" elegida={b.condicion === false} onElegir={() => elegir({ condicion: false }, "dieta")} />
             <p className="entra text-center text-xs text-muted" style={{ "--i": 3 } as React.CSSProperties}>
               Tu respuesta no sale de este teléfono: solo la usamos para mostrarte un aviso.
+            </p>
+          </Pregunta>
+        )}
+
+        {paso === "dieta" && (
+          <Pregunta titulo="¿Qué tipo de dieta prefieres?" ayuda="Cambia de dónde vienen tus calorías, no cuántas son.">
+            {ORDEN_DIETAS.map((id, i) => (
+              <Opcion
+                key={id}
+                i={i}
+                emoji={DIETAS[id].emoji}
+                titulo={DIETAS[id].titulo}
+                detalle={DIETAS[id].detalle}
+                elegida={b.dieta === id}
+                onElegir={() => elegir({ dieta: id }, "fuerza")}
+              />
+            ))}
+          </Pregunta>
+        )}
+
+        {paso === "fuerza" && (
+          <Pregunta
+            titulo="¿Haces entrenamiento de fuerza?"
+            ayuda="Pesas, bandas o tu propio peso. Es clave para calcular cuánta proteína necesitas."
+          >
+            <Opcion i={0} emoji="💪" titulo="Sí" elegida={b.fuerza === true} onElegir={() => elegir({ fuerza: true }, "creando")} />
+            <Opcion i={1} emoji="🚶" titulo="No" elegida={b.fuerza === false} onElegir={() => elegir({ fuerza: false }, "creando")} />
+            <p className="entra text-center text-xs text-muted" style={{ "--i": 3 } as React.CSSProperties}>
+              Si no entrenas, la proteína que necesitas es un poco menor.
             </p>
           </Pregunta>
         )}
@@ -462,6 +507,11 @@ export function Entrada() {
 
             <div className="entra rounded-3xl border border-hairline bg-surface p-5 shadow-[var(--shadow)]" style={{ "--i": 2 } as React.CSSProperties}>
               <MedidorSemicirculo valor={plan.calculo.kcalObjetivo} unidad="kcal" min={plan.rango.min} max={plan.rango.max} />
+              {entrada.dieta && entrada.dieta !== "recomendada" && (
+                <p className="mt-4 text-center text-sm text-ink-2">
+                  <span aria-hidden="true">{DIETAS[entrada.dieta].emoji}</span> Dieta {DIETAS[entrada.dieta].titulo.toLowerCase()}
+                </p>
+              )}
               <div className="mt-5 grid grid-cols-3 gap-2 text-center">
                 <Macro i={0} etiqueta="Proteínas" g={plan.calculo.proteinaG} color="var(--macro-prot)" />
                 <Macro i={1} etiqueta="Carbos" g={plan.calculo.carbsG} color="var(--macro-carb)" />
@@ -473,6 +523,9 @@ export function Entrada() {
               <Aviso nivel="info">{EXPECTATIVA[b.meta]}</Aviso>
             </div>
 
+            {entrada.dieta && DIETAS[entrada.dieta].aviso && (
+              <Aviso nivel="atencion">{DIETAS[entrada.dieta].aviso}</Aviso>
+            )}
             {b.condicion && (
               <Aviso nivel="atencion">
                 Por tu condición de salud, habla con tu médico o un nutricionista antes de cambiar tu alimentación. Usa este plan

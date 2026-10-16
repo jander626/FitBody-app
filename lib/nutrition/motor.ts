@@ -8,6 +8,7 @@
 import type {
   Aviso,
   DatosPersona,
+  DialesBase,
   Macros,
   Objetivo,
   OpcionesPlan,
@@ -28,7 +29,7 @@ export const PISO_KCAL: Record<Sexo, number> = { hombre: 1500, mujer: 1200 };
 /** Mínimo fisiológico de grasa, en g/kg. Por debajo se resiente lo hormonal. */
 export const GRASA_MINIMA_G_POR_KG = 0.6;
 
-const DEFECTOS: Required<OpcionesPlan> = {
+const DEFECTOS: DialesBase = {
   proteinaGPorKg: 2.0,
   grasaGPorKg: 0.9,
 };
@@ -90,12 +91,45 @@ export function macros(
   const { proteinaGPorKg, grasaGPorKg } = { ...DEFECTOS, ...opciones };
 
   const proteinaG = redondearA(pesoKg * proteinaGPorKg, 5);
+
+  // Con un porcentaje de carbohidratos fijado, la grasa es la que se adapta:
+  // lo que no son proteína ni carbohidratos. Sin él, la grasa se fija por kg y
+  // los carbohidratos se llevan lo que sobre.
+  if (opciones.carbsPct !== undefined) {
+    const carbsG = Math.round((kcal * opciones.carbsPct) / KCAL_POR_G.carbs);
+    const kcalGrasa = kcal - proteinaG * KCAL_POR_G.proteina - carbsG * KCAL_POR_G.carbs;
+    const grasaG = Math.max(0, redondearA(kcalGrasa / KCAL_POR_G.grasa, 5));
+    return { proteinaG, carbsG, grasaG };
+  }
+
   const grasaG = redondearA(pesoKg * grasaGPorKg, 5);
 
   const kcalRestantes =
     kcal - proteinaG * KCAL_POR_G.proteina - grasaG * KCAL_POR_G.grasa;
   const carbsG = Math.max(0, Math.round(kcalRestantes / KCAL_POR_G.carbs));
 
+  return { proteinaG, carbsG, grasaG };
+}
+
+/**
+ * Reparto nuevo con las mismas gramos de proteína y de grasa que ya había.
+ *
+ * Es lo que se usa al ajustar las calorías durante el plan: la proteína y la
+ * grasa son necesidades absolutas (y la forma de comer que la persona eligió:
+ * keto, alta en proteína…), así que se conservan, y los carbohidratos absorben
+ * el cambio. Si no cabe la grasa, se recorta antes que la proteína.
+ */
+export function repartoConservando(
+  actual: { proteinaG: number; grasaG: number },
+  kcal: number,
+): Macros {
+  const { proteinaG } = actual;
+  const maxGrasa = Math.floor((kcal - proteinaG * KCAL_POR_G.proteina) / KCAL_POR_G.grasa);
+  const grasaG = Math.max(0, Math.min(actual.grasaG, maxGrasa));
+  const carbsG = Math.max(
+    0,
+    Math.round((kcal - proteinaG * KCAL_POR_G.proteina - grasaG * KCAL_POR_G.grasa) / KCAL_POR_G.carbs),
+  );
   return { proteinaG, carbsG, grasaG };
 }
 

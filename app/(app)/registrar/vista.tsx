@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Encabezado } from "@/components/ui";
 import type { Alimento } from "@/lib/alimentos";
-import type { Totales } from "@/lib/registro/tipos";
+import type { MOMENTOS, Totales } from "@/lib/registro/tipos";
 import { Conversacion } from "./conversacion";
 import { RegistroManual } from "./manual";
 
@@ -13,12 +13,15 @@ export function VistaRegistrar({
   alimentos,
   fecha,
   userId,
+  momentoInicial,
   objetivo,
   consumido,
 }: {
   alimentos: Alimento[];
   fecha: string;
   userId: string;
+  /** La comida desde la que se llegó (el "+" de Hoy); si no, se sugiere por hora. */
+  momentoInicial?: (typeof MOMENTOS)[number];
   objetivo: Totales | null;
   consumido: Totales;
 }) {
@@ -80,6 +83,7 @@ export function VistaRegistrar({
             alimentos={alimentos}
             fecha={fecha}
             userId={userId}
+            momentoInicial={momentoInicial}
             objetivo={objetivo}
             consumido={consumido}
           />
@@ -88,6 +92,7 @@ export function VistaRegistrar({
           <RegistroManual
             alimentos={alimentos}
             fecha={fecha}
+            momentoInicial={momentoInicial}
             objetivo={objetivo}
             consumido={consumido}
           />

@@ -1,5 +1,6 @@
 "use client";
 
+import { puntoEnArco, trazoArco } from "@/lib/arco";
 import { useCuenta } from "./movimiento";
 
 /**
@@ -23,18 +24,7 @@ export function MedidorSemicirculo({
 }) {
   const animado = useCuenta(valor, 1100);
 
-  // Semicírculo de radio 90 centrado en (100, 100); `t` va de 0 a 1.
-  const punto = (t: number) => {
-    const ang = Math.PI * (1 - t);
-    return { x: 100 + 90 * Math.cos(ang), y: 100 - 90 * Math.sin(ang) };
-  };
-  const arco = (desde: number, hasta: number) => {
-    const a = punto(desde);
-    const b = punto(hasta);
-    return `M ${a.x.toFixed(2)} ${a.y.toFixed(2)} A 90 90 0 0 1 ${b.x.toFixed(2)} ${b.y.toFixed(2)}`;
-  };
-
-  const marca = punto(0.5);
+  const marca = puntoEnArco(0.5);
 
   return (
     <figure
@@ -47,9 +37,9 @@ export function MedidorSemicirculo({
         <span className="ml-1 text-base font-normal text-muted">{unidad}</span>
       </p>
 
-      <svg viewBox="0 -10 200 115" className="mx-auto mt-2 w-full max-w-xs" aria-hidden="true">
+      <svg viewBox="0 -10 200 120" className="mx-auto mt-2 w-full max-w-xs" aria-hidden="true">
         <path
-          d={arco(0, 1)}
+          d={trazoArco(0, 1)}
           fill="none"
           stroke="var(--accent)"
           strokeOpacity="0.2"
@@ -57,7 +47,7 @@ export function MedidorSemicirculo({
           strokeLinecap="round"
         />
         <path
-          d={arco(0.04, 0.96)}
+          d={trazoArco(0.04, 0.96)}
           fill="none"
           stroke="var(--accent)"
           strokeWidth="12"

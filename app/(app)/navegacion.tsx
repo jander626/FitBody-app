@@ -4,60 +4,83 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 /**
- * Barra inferior fija.
+ * Barra inferior flotante.
  *
- * Registrar va al medio y con más peso visual porque es lo que se usa cuatro
- * veces al día; lo demás se consulta. El objetivo del plan es que llegar a la
- * cámara cueste como máximo dos toques — desde acá cuesta uno.
+ * Cuatro destinos y el "+" en el medio, más grande: registrar es lo que se usa
+ * cuatro veces al día; lo demás se consulta. El perfil dejó la barra y vive en
+ * el círculo de arriba a la derecha de Hoy: seis destinos eran demasiados para
+ * un pulgar, y los ajustes se tocan una vez al mes.
+ *
+ * Una pastilla de color sigue a la pantalla activa y se desliza de un destino a
+ * otro: es la señal de "estás aquí", y el movimiento hace que cambiar de
+ * pantalla se sienta como un solo gesto continuo.
  */
-const DESTINOS = [
+const IZQUIERDA = [
   { href: "/hoy", etiqueta: "Hoy", icono: AnilloIcono },
   { href: "/historial", etiqueta: "Historial", icono: CalendarioIcono },
-  { href: "/registrar", etiqueta: "Registrar", icono: MasIcono, principal: true },
+] as const;
+
+const DERECHA = [
   { href: "/consejos", etiqueta: "Consejos", icono: BrujulaIcono },
   { href: "/peso", etiqueta: "Peso", icono: CurvaIcono },
-  { href: "/perfil", etiqueta: "Perfil", icono: PersonaIcono },
 ] as const;
+
+/** Las cinco columnas, en orden; el "+" ocupa la del medio. */
+const COLUMNAS = [...IZQUIERDA, null, ...DERECHA] as const;
 
 export function NavegacionInferior() {
   const pathname = usePathname();
+  const estaEn = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+
+  // Perfil y Garmin no tienen botón en la barra: ahí no hay ninguna activa y la
+  // pastilla se esconde en vez de quedarse en un destino que no es.
+  const indiceActivo = COLUMNAS.findIndex((c) => c !== null && estaEn(c.href));
+  const registrando = estaEn("/registrar");
 
   return (
     <nav
       aria-label="Principal"
-      className="safe-bottom fixed inset-x-0 bottom-0 z-10 mx-auto max-w-md border-t border-hairline bg-surface/95 backdrop-blur"
+      className="fixed inset-x-0 z-10 mx-auto max-w-md px-4"
+      style={{ bottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
     >
-      <ul className="flex items-stretch justify-around">
-        {DESTINOS.map(({ href, etiqueta, icono: Icono, ...resto }) => {
-          const activo = pathname === href || pathname.startsWith(`${href}/`);
-          const principal = "principal" in resto && resto.principal;
+      <div className="relative grid grid-cols-5 items-center rounded-full border border-hairline bg-surface/90 px-1.5 py-1.5 shadow-[var(--shadow)] backdrop-blur-md">
+        {/* La pastilla: una columna de ancho, se desliza con transform. */}
+        <span
+          aria-hidden="true"
+          className="absolute inset-y-1.5 left-1.5 rounded-full bg-accent-soft transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)]"
+          style={{
+            width: "calc((100% - 0.75rem) / 5)",
+            transform: `translateX(${Math.max(indiceActivo, 0) * 100}%)`,
+            opacity: indiceActivo === -1 ? 0 : 1,
+          }}
+        />
 
-          return (
-            <li key={href} className="flex-1">
-              <Link
-                href={href}
-                aria-current={activo ? "page" : undefined}
-                className={`flex flex-col items-center gap-1 px-0.5 py-2.5 text-[10px] transition-colors ${
-                  activo ? "text-accent" : "text-muted"
-                }`}
-              >
-                <span
-                  className={
-                    principal
-                      ? "flex size-9 items-center justify-center rounded-full bg-accent text-sobre-accent"
-                      : "flex size-9 items-center justify-center"
-                  }
-                >
-                  <Icono />
-                </span>
-                <span className={activo ? "font-medium" : undefined}>
-                  {etiqueta}
-                </span>
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
+        {COLUMNAS.map((destino, i) =>
+          destino === null ? (
+            <Link
+              key="registrar"
+              href="/registrar"
+              aria-label="Registrar"
+              aria-current={registrando ? "page" : undefined}
+              className="relative -my-5 mx-auto flex size-14 items-center justify-center rounded-full bg-accent text-sobre-accent shadow-[var(--shadow)]"
+            >
+              <MasIcono />
+            </Link>
+          ) : (
+            <Link
+              key={destino.href}
+              href={destino.href}
+              aria-current={i === indiceActivo ? "page" : undefined}
+              className={`relative flex flex-col items-center gap-0.5 rounded-full py-2 text-[10px] transition-colors ${
+                i === indiceActivo ? "font-medium text-accent" : "text-muted"
+              }`}
+            >
+              <destino.icono />
+              {destino.etiqueta}
+            </Link>
+          ),
+        )}
+      </div>
     </nav>
   );
 }
@@ -80,7 +103,7 @@ function AnilloIcono() {
 
 function MasIcono() {
   return (
-    <svg viewBox="0 0 24 24" className="size-5" fill="none" aria-hidden="true">
+    <svg viewBox="0 0 24 24" className="size-6" fill="none" aria-hidden="true">
       <path
         d="M12 5v14M5 12h14"
         stroke="currentColor"
@@ -128,20 +151,6 @@ function BrujulaIcono() {
         stroke="currentColor"
         strokeWidth="2"
         strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function PersonaIcono() {
-  return (
-    <svg viewBox="0 0 24 24" className="size-5" fill="none" aria-hidden="true">
-      <circle cx="12" cy="8" r="3.5" stroke="currentColor" strokeWidth="2" />
-      <path
-        d="M5 19.5a7 7 0 0 1 14 0"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
       />
     </svg>
   );

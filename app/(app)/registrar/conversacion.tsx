@@ -47,6 +47,8 @@ export interface PropsRegistro {
   alimentos: Alimento[];
   fecha: string;
   userId: string;
+  /** Si se llegó desde el "+" de una comida de Hoy, esa comida; si no, por hora. */
+  momentoInicial?: (typeof MOMENTOS)[number];
   objetivo: Totales | null;
   consumido: Totales;
 }
@@ -76,6 +78,7 @@ function Formulario({
   alimentos,
   fecha,
   userId,
+  momentoInicial,
   objetivo,
   consumido,
 }: PropsRegistro) {
@@ -85,10 +88,14 @@ function Formulario({
   const [recuperado] = useState(() => leerBorrador({ fecha }));
   const [estado, setEstado] = useState<EstadoBorrador>(() =>
     recuperado
-      ? { ...recuperado, items: recuperado.items.map(conClave) }
+      ? {
+          ...recuperado,
+          momento: momentoInicial ?? recuperado.momento,
+          items: recuperado.items.map(conClave),
+        }
       : {
           texto: "",
-          momento: momentoSugerido(new Date().getHours()),
+          momento: momentoInicial ?? momentoSugerido(new Date().getHours()),
           estimacion: null,
           items: [],
         },
@@ -265,7 +272,7 @@ function Formulario({
   function empezarDeNuevo() {
     setEstado({
       texto: "",
-      momento: momentoSugerido(new Date().getHours()),
+      momento: momentoInicial ?? momentoSugerido(new Date().getHours()),
       estimacion: null,
       items: [],
     });

@@ -1,14 +1,21 @@
 import { redirect } from "next/navigation";
 import { listarAlimentos } from "@/lib/datos/alimentos";
 import { fechaDeHoy, obtenerDia } from "@/lib/datos/diario";
+import { MOMENTOS } from "@/lib/registro/tipos";
 import { usuarioActual } from "@/lib/supabase/cliente-servidor";
 import { VistaRegistrar } from "./vista";
 
 export const metadata = { title: "Registrar — FitFood" };
 
-export default async function Registrar() {
+export default async function Registrar(props: PageProps<"/registrar">) {
   const usuario = await usuarioActual();
   if (!usuario) redirect("/login");
+
+  const { momento } = await props.searchParams;
+  const momentoInicial =
+    typeof momento === "string" && (MOMENTOS as readonly string[]).includes(momento)
+      ? (momento as (typeof MOMENTOS)[number])
+      : undefined;
 
   const fecha = await fechaDeHoy();
   const [alimentos, dia] = await Promise.all([
@@ -23,6 +30,7 @@ export default async function Registrar() {
       alimentos={alimentos}
       fecha={fecha}
       userId={usuario.id}
+      momentoInicial={momentoInicial}
       objetivo={dia.objetivo}
       consumido={dia.totales}
     />

@@ -81,6 +81,26 @@ const ORDEN_MOMENTO = [
   "otro",
 ];
 
+/**
+ * De estas fechas, cuáles tienen al menos una comida registrada.
+ *
+ * Es lo que pinta los puntos de la franja de la semana. Se pide solo la
+ * columna de fecha: no hace falta traer comidas para saber si hay.
+ */
+export async function diasConRegistro(userId: string, fechas: string[]): Promise<string[]> {
+  if (fechas.length === 0) return [];
+  const supabase = await clienteServidor();
+
+  const { data } = await supabase
+    .from("meal_logs")
+    .select("fecha")
+    .eq("user_id", userId)
+    .gte("fecha", fechas[0])
+    .lte("fecha", fechas[fechas.length - 1]);
+
+  return [...new Set((data ?? []).map((c) => c.fecha))];
+}
+
 /** Lee un día completo del diario con su objetivo activo. */
 export async function obtenerDia(userId: string, fecha: string): Promise<Dia> {
   const supabase = await clienteServidor();

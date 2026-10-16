@@ -19,6 +19,11 @@ const COLOR: Record<EstadoMedidor, string> = {
   excedido: "var(--bad)",
 };
 
+/** El color de una barra según su estado; `tono` manda solo mientras avanza. */
+export function colorMedidor(estado: EstadoMedidor, tono?: string): string {
+  return estado === "progreso" && tono ? tono : COLOR[estado];
+}
+
 export function Medidor({
   etiqueta,
   valor,

@@ -27,18 +27,21 @@ import { guardarComida } from "./acciones";
 export function RegistroManual({
   alimentos,
   fecha,
+  momentoInicial,
   objetivo,
   consumido,
 }: {
   alimentos: Alimento[];
   fecha: string;
+  /** La comida desde la que se llegó (el "+" de Hoy); si no, se sugiere por hora. */
+  momentoInicial?: (typeof MOMENTOS)[number];
   objetivo: Totales | null;
   consumido: Totales;
 }) {
   const router = useRouter();
   const [consulta, setConsulta] = useState("");
-  const [momento, setMomento] = useState(() =>
-    momentoSugerido(new Date().getHours()),
+  const [momento, setMomento] = useState(
+    () => momentoInicial ?? momentoSugerido(new Date().getHours()),
   );
   const [items, setItems] = useState<ItemEditable[]>([]);
   const [error, setError] = useState<string | null>(null);

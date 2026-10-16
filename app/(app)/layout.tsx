@@ -23,7 +23,7 @@ export default async function LayoutApp({ children }: LayoutProps<"/">) {
       */}
       <div
         className="safe-top flex-1"
-        style={{ paddingBottom: "calc(5rem + env(safe-area-inset-bottom))" }}
+        style={{ paddingBottom: "calc(6.5rem + env(safe-area-inset-bottom))" }}
       >
         {children}
       </div>

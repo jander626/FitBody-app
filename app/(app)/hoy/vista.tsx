@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { Aviso, Tarjeta, TituloSeccion } from "@/components/ui";
+import { Aviso, TituloSeccion } from "@/components/ui";
 import { FotoAmpliable } from "@/components/foto-ampliable";
 import { TarjetaConsejo } from "@/components/tarjeta-consejo";
-import { NavegacionDia } from "@/components/navegacion-dia";
-import { Medidor, estadoMacro, type EstadoMedidor } from "@/components/medidor";
+import { FranjaSemana } from "@/components/franja-semana";
+import { MedidorDia } from "@/components/medidor-dia";
 import type { ComidaDiario, Dia } from "@/lib/datos/diario";
 import type { Consejo } from "@/lib/coach/consejos";
 
@@ -36,171 +36,213 @@ function formatearPorcion(item: {
   return null;
 }
 
+/** Las comidas que siempre se muestran, aunque estén vacías, y en este orden. */
+const MOMENTOS_FIJOS = ["desayuno", "almuerzo", "cena", "snack"] as const;
+
+const EMOJI_MOMENTO: Record<string, string> = {
+  desayuno: "🍳",
+  almuerzo: "🍽️",
+  cena: "🌙",
+  snack: "🍎",
+  postre: "🍰",
+  bebida: "🥤",
+  otro: "➕",
+};
+
+const DIAS = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+
+/** "martes 24 de ago" — sin el año, que en un diario diario sobra. */
+function enPalabras(fecha: string): string {
+  const d = new Date(`${fecha}T00:00:00Z`);
+  return `${DIAS[d.getUTCDay()]} ${d.getUTCDate()} de ${MESES[d.getUTCMonth()]}`;
+}
+
 export function VistaHoy({
   dia,
   esHoy,
   hoy,
+  semana,
+  registrados,
   consejo,
 }: {
   dia: Dia;
   esHoy: boolean;
   hoy: string;
+  /** Las siete fechas de la semana del día que se mira, lunes primero. */
+  semana: string[];
+  /** De esas fechas, las que tienen comidas. */
+  registrados: string[];
   /** El más urgente de la semana. Null en días pasados. */
   consejo: Consejo | null;
 }) {
   const { totales, objetivo, comidas } = dia;
 
-  const restantes = objetivo ? objetivo.kcal - totales.kcal : null;
-  const excedido = restantes !== null && restantes < 0;
-
-  const estadoKcal: EstadoMedidor = !objetivo
-    ? "progreso"
-    : totales.kcal > objetivo.kcal * 1.05
-      ? "excedido"
-      : "progreso";
+  // Lo que no es una de las cuatro comidas fijas (postre, bebida, otro) solo
+  // aparece cuando hay algo registrado: una tarjeta vacía por cada una sería
+  // ruido en una pantalla que se abre cuatro veces al día.
+  const extras = [...new Set(comidas.map((c) => c.momento))].filter(
+    (m) => !(MOMENTOS_FIJOS as readonly string[]).includes(m),
+  );
 
   return (
     <>
-      {/* Cabecera: el número grande es la respuesta a "¿cuánto me queda?".
-          Va en la sans y con cifras proporcionales — la serif y las cifras
-          tabulares son para los títulos y las columnas, no para esto. */}
-      <header className="px-5 pt-8 pb-5">
-        <NavegacionDia fecha={dia.fecha} hoy={hoy} />
+      <header className="px-5 pt-6 pb-2">
+        <div className="entra flex items-center justify-between gap-3">
+          <Link
+            href="/historial"
+            aria-label="Ver el historial y elegir otro día"
+            className="font-serif text-3xl text-ink"
+          >
+            {esHoy ? "Hoy" : enPalabras(dia.fecha)}
+          </Link>
+          <Link
+            href="/perfil"
+            aria-label="Perfil"
+            className="flex size-11 items-center justify-center rounded-full border border-hairline bg-surface text-muted"
+          >
+            <svg viewBox="0 0 24 24" className="size-5" fill="none" aria-hidden="true">
+              <circle cx="12" cy="8" r="3.5" stroke="currentColor" strokeWidth="2" />
+              <path d="M5 19.5a7 7 0 0 1 14 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </Link>
+        </div>
 
-        {objetivo ? (
-          <>
-            <p className="mt-1 flex items-baseline gap-2">
-              <span
-                className={`text-5xl font-semibold tracking-tight ${
-                  excedido ? "text-bad" : "text-ink"
-                }`}
-              >
-                {Math.abs(Math.round(restantes!))}
-              </span>
-              <span className="text-base text-muted">
-                kcal {excedido ? "de más" : "restantes"}
-              </span>
-            </p>
-            <p className="mt-1 text-sm text-muted">
-              {Math.round(totales.kcal)} de {objetivo.kcal} kcal
-            </p>
-          </>
-        ) : (
-          <p className="mt-1 text-2xl text-ink">
-            {Math.round(totales.kcal)}{" "}
-            <span className="text-base text-muted">kcal</span>
-          </p>
-        )}
+        <div className="mt-4">
+          <FranjaSemana semana={semana} fecha={dia.fecha} hoy={hoy} registrados={registrados} />
+        </div>
       </header>
 
-      <div className="space-y-6 px-5">
-        {!objetivo && (
-          <div>
+      <div className="space-y-5 px-5 pt-3">
+        {!objetivo ? (
+          <div className="entra">
             <Aviso nivel="info">
-              Todavía no hay un objetivo configurado. Sin él no se puede decir
-              cuánto te queda cada día.
+              Todavía no hay un objetivo configurado. Sin él no se puede decir cuánto te queda cada día.
             </Aviso>
             <Link
               href="/objetivo"
-              className="mt-3 block rounded-xl bg-accent px-4 py-3 text-center text-base font-medium text-sobre-accent"
+              className="mt-3 block rounded-full bg-accent px-4 py-3.5 text-center text-base font-semibold text-sobre-accent"
             >
               Calcular mi plan
             </Link>
           </div>
-        )}
-
-        {objetivo && (
-          <Tarjeta>
-            <Medidor
-              etiqueta="Calorías"
-              valor={totales.kcal}
+        ) : (
+          <div
+            className="entra rounded-3xl border border-hairline bg-surface p-5 shadow-[var(--shadow)]"
+            style={{ "--i": 2 } as React.CSSProperties}
+          >
+            {/* La clave hace que el medidor se llene de nuevo al cambiar de
+                día: ver crecer la barra es lo que le da peso al dato. */}
+            <MedidorDia
+              key={dia.fecha}
+              consumido={totales.kcal}
               objetivo={objetivo.kcal}
-              unidad="kcal"
-              estado={estadoKcal}
+              macros={[
+                { etiqueta: "Proteínas", valor: totales.proteinaG, objetivo: objetivo.proteinaG, minimo: true, tono: "var(--macro-prot)" },
+                { etiqueta: "Carbos", valor: totales.carbsG, objetivo: objetivo.carbsG, tono: "var(--macro-carb)" },
+                { etiqueta: "Grasas", valor: totales.grasaG, objetivo: objetivo.grasaG, tono: "var(--macro-gras)" },
+              ]}
             />
-            <div className="my-1 border-t border-hairline-soft" />
-            <Medidor
-              etiqueta="Proteína"
-              valor={totales.proteinaG}
-              objetivo={objetivo.proteinaG}
-              unidad="g"
-              minimo
-              tono="var(--macro-prot)"
-              estado={estadoMacro(totales.proteinaG, objetivo.proteinaG, true)}
-            />
-            <Medidor
-              etiqueta="Carbohidratos"
-              valor={totales.carbsG}
-              objetivo={objetivo.carbsG}
-              unidad="g"
-              tono="var(--macro-carb)"
-              estado={estadoMacro(totales.carbsG, objetivo.carbsG, false)}
-            />
-            <Medidor
-              etiqueta="Grasa"
-              valor={totales.grasaG}
-              objetivo={objetivo.grasaG}
-              unidad="g"
-              tono="var(--macro-gras)"
-              estado={estadoMacro(totales.grasaG, objetivo.grasaG, false)}
-            />
-            <p className="mt-2 text-xs text-muted">
-              La proteína se persigue hacia arriba; el resto son techos.
-            </p>
-          </Tarjeta>
+          </div>
         )}
 
         {consejo && (
-          <div>
+          <div className="entra" style={{ "--i": 3 } as React.CSSProperties}>
             {/* Solo el más urgente. Los demás están en /consejos: una lista
                 larga en la pantalla que se abre cuatro veces al día deja de
                 leerse a los tres días. */}
             <TituloSeccion>Lo que dicen tus datos</TituloSeccion>
             <TarjetaConsejo consejo={consejo} />
-            <Link
-              href="/consejos"
-              className="mt-2 block py-2 text-center text-sm text-muted"
-            >
+            <Link href="/consejos" className="mt-2 block py-2 text-center text-sm text-muted">
               Ver todos los consejos
             </Link>
           </div>
         )}
 
-        <div>
-          <TituloSeccion>
-            {comidas.length === 0
-              ? "Sin comidas registradas"
-              : `${comidas.length} ${comidas.length === 1 ? "comida" : "comidas"}`}
-          </TituloSeccion>
-
-          {comidas.length === 0 ? (
-            <Tarjeta>
-              <p className="text-sm text-ink-2">
-                Todavía no registraste nada{esHoy ? " hoy" : " este día"}.
-              </p>
-              <Link
-                href="/registrar"
-                className="mt-3 block rounded-xl bg-accent px-4 py-3 text-center text-base font-medium text-sobre-accent"
-              >
-                Registrar una comida
-              </Link>
-            </Tarjeta>
-          ) : (
-            <div className="space-y-3">
-              {comidas.map((comida) => (
-                <TarjetaComida key={comida.id} comida={comida} />
-              ))}
-            </div>
-          )}
+        <div className="space-y-3">
+          {[...MOMENTOS_FIJOS, ...extras].map((momento, i) => (
+            <SeccionComida
+              key={momento}
+              i={i + 4}
+              momento={momento}
+              comidas={comidas.filter((c) => c.momento === momento)}
+              // El registro siempre es del día de hoy: ofrecer "+" en un día
+              // pasado sería agregar la comida a otro día sin avisar.
+              puedeAgregar={esHoy}
+            />
+          ))}
         </div>
       </div>
     </>
   );
 }
 
-function TarjetaComida({ comida }: { comida: ComidaDiario }) {
+function SeccionComida({
+  i,
+  momento,
+  comidas,
+  puedeAgregar,
+}: {
+  i: number;
+  momento: string;
+  comidas: ComidaDiario[];
+  puedeAgregar: boolean;
+}) {
+  const kcal = comidas.reduce((n, c) => n + c.subtotal.kcal, 0);
+  const p = comidas.reduce((n, c) => n + c.subtotal.proteinaG, 0);
+  const c = comidas.reduce((n, x) => n + x.subtotal.carbsG, 0);
+  const g = comidas.reduce((n, x) => n + x.subtotal.grasaG, 0);
+  const nombre = NOMBRE_MOMENTO[momento] ?? momento;
+
   return (
-    <Tarjeta>
+    <section
+      className="entra rounded-3xl border border-hairline bg-surface p-4 shadow-[var(--shadow)]"
+      style={{ "--i": i } as React.CSSProperties}
+    >
+      <div className="flex items-center gap-3">
+        <span className="text-2xl" aria-hidden="true">
+          {EMOJI_MOMENTO[momento] ?? "🍴"}
+        </span>
+        <div className="min-w-0 flex-1">
+          <h2 className="font-medium text-ink">{nombre}</h2>
+          <p className="font-mono text-xs text-muted tabular-nums">
+            {Math.round(kcal)} kcal · {Math.round(p)}P {Math.round(c)}C {Math.round(g)}G
+          </p>
+        </div>
+        {puedeAgregar && comidas.length > 0 && (
+          <Link
+            href={`/registrar?momento=${momento}`}
+            aria-label={`Agregar al ${nombre.toLowerCase()}`}
+            className="flex size-10 shrink-0 items-center justify-center rounded-full bg-accent-soft text-xl text-accent"
+          >
+            +
+          </Link>
+        )}
+      </div>
+
+      {comidas.length === 0 ? (
+        puedeAgregar && (
+          <Link
+            href={`/registrar?momento=${momento}`}
+            className="mt-3 flex items-center justify-center gap-2 rounded-full bg-hairline-soft py-3 text-sm font-medium text-ink-2"
+          >
+            <span className="text-lg leading-none">+</span> Agregar {nombre.toLowerCase()}
+          </Link>
+        )
+      ) : (
+        <div className="mt-3 space-y-4 border-t border-hairline-soft pt-3">
+          {comidas.map((comida) => (
+            <ComidaRegistrada key={comida.id} comida={comida} />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function ComidaRegistrada({ comida }: { comida: ComidaDiario }) {
+  return (
+    <div>
       <div className="flex items-start gap-3">
         {comida.fotoUrl && (
           // Chica y cuadrada: acá alcanza para reconocer el plato. Tocarla la
@@ -216,13 +258,8 @@ function TarjetaComida({ comida }: { comida: ComidaDiario }) {
         )}
 
         <div className="flex flex-1 items-baseline justify-between gap-3">
-          <h3 className="font-medium text-ink">
-            {NOMBRE_MOMENTO[comida.momento] ?? comida.momento}
-            {comida.hora && (
-              <span className="ml-2 text-xs font-normal text-muted">
-                {comida.hora.slice(0, 5)}
-              </span>
-            )}
+          <h3 className="text-xs text-muted">
+            {comida.hora ? comida.hora.slice(0, 5) : "Registrada"}
           </h3>
           <span className="font-mono text-sm text-ink tabular-nums">
             {Math.round(comida.subtotal.kcal)}
@@ -283,6 +320,6 @@ function TarjetaComida({ comida }: { comida: ComidaDiario }) {
       {comida.nota && (
         <p className="mt-2 text-xs leading-relaxed text-muted">{comida.nota}</p>
       )}
-    </Tarjeta>
+    </div>
   );
 }

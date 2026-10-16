@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Aviso, Tarjeta, TituloSeccion, claseControl } from "@/components/ui";
 import { EditorItems, type ItemEditable } from "@/components/editor-items";
@@ -49,6 +49,13 @@ export interface PropsRegistro {
   userId: string;
   /** Si se llegó desde el "+" de una comida de Hoy, esa comida; si no, por hora. */
   momentoInicial?: (typeof MOMENTOS)[number];
+  /**
+   * Una foto tomada en el visor en vivo. `n` cambia con cada foto, para que
+   * tomar dos seguidas dispare dos veces aunque el archivo sea parecido.
+   */
+  fotoExterna?: { archivo: File; n: number } | null;
+  /** Avisa, al montar, si había algo sin guardar (para no abrir la cámara encima). */
+  alRevisarBorrador?: (hayBorrador: boolean) => void;
   objetivo: Totales | null;
   consumido: Totales;
 }
@@ -79,6 +86,8 @@ function Formulario({
   fecha,
   userId,
   momentoInicial,
+  fotoExterna,
+  alRevisarBorrador,
   objetivo,
   consumido,
 }: PropsRegistro) {
@@ -105,6 +114,11 @@ function Formulario({
     return guardada ? { base64: guardada } : null;
   });
   const [avisoRecuperado, setAvisoRecuperado] = useState(recuperado !== null);
+
+  useEffect(() => {
+    alRevisarBorrador?.(recuperado !== null || leerFoto() !== null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al montar
+  }, []);
 
   const [error, setError] = useState<string | null>(null);
   const [fueraDeTema, setFueraDeTema] = useState<string | null>(null);
@@ -143,9 +157,7 @@ function Formulario({
     if (base64 === null && inputFoto.current) inputFoto.current.value = "";
   }
 
-  async function elegirFoto(evento: React.ChangeEvent<HTMLInputElement>) {
-    const archivo = evento.target.files?.[0];
-    if (!archivo) return;
+  async function procesarFoto(archivo: File) {
     setError(null);
     try {
       const comprimida = await comprimirFoto(archivo);
@@ -154,6 +166,20 @@ function Formulario({
       setError(err instanceof Error ? err.message : "No se pudo leer la foto.");
     }
   }
+
+  async function elegirFoto(evento: React.ChangeEvent<HTMLInputElement>) {
+    const archivo = evento.target.files?.[0];
+    if (archivo) await procesarFoto(archivo);
+  }
+
+  // Una foto del visor en vivo entra por el mismo camino que una de galería.
+  const ultimaExterna = useRef<number | null>(null);
+  useEffect(() => {
+    if (!fotoExterna || ultimaExterna.current === fotoExterna.n) return;
+    ultimaExterna.current = fotoExterna.n;
+    void procesarFoto(fotoExterna.archivo);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- procesarFoto cambia en cada render; la clave es `n`
+  }, [fotoExterna]);
 
   /** Sube la foto a Storage para poder medir precisión después. */
   async function subirFoto(base64: string): Promise<string | null> {

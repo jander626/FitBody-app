@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { diasConRegistro, fechaDeHoy, obtenerDia } from "@/lib/datos/diario";
+import { haceDias, racha } from "@/lib/racha";
 import { semanaDe } from "@/lib/semana";
 import { obtenerConsejos } from "@/lib/datos/consejos";
 import { usuarioActual } from "@/lib/supabase/cliente-servidor";
@@ -20,10 +21,13 @@ export default async function Hoy(props: PageProps<"/hoy">) {
   // El consejo principal se trae solo mirando hoy: en un día pasado es ruido,
   // porque el análisis siempre habla de la última semana.
   const semana = semanaDe(dia);
-  const [diario, consejos, registrados] = await Promise.all([
+  // La racha mira 60 días hacia atrás desde hoy; la franja, la semana que se
+  // ve. Una sola consulta cubriría las dos, pero la semana puede ser antigua.
+  const [diario, consejos, registrados, recientes] = await Promise.all([
     obtenerDia(usuario.id, dia),
     dia === hoy ? obtenerConsejos(usuario.id) : null,
     diasConRegistro(usuario.id, semana),
+    diasConRegistro(usuario.id, [haceDias(hoy, 60), hoy]),
   ]);
 
   // Primera vez: sin objetivo ni comidas no hay nada que mostrar, y la pantalla
@@ -39,6 +43,7 @@ export default async function Hoy(props: PageProps<"/hoy">) {
       hoy={hoy}
       semana={semana}
       registrados={registrados}
+      racha={racha(recientes, hoy)}
       consejo={consejos?.consejos[0] ?? null}
     />
   );

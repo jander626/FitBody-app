@@ -228,7 +228,7 @@ function sobreProteina(
       area: "proteina",
       prioridad: faltantes >= dias.length / 2 ? 10 : 25,
       titulo: `La proteína quedó corta ${faltantes} de ${dias.length} días`,
-      detalle: `Faltan ${r0(brecha)} g al día en promedio. En déficit, la proteína es lo que protege el músculo: sin ella, parte de lo que marca la balanza es masa magra, y eso la cintura lo delata antes que el peso. ${r0(brecha)} g son un huevo y medio, o 100 g de pollo, o un puñado de atún.`,
+      detalle: `Faltan ${r0(brecha)} g al día en promedio. En déficit, la proteína es lo que protege el músculo: sin ella, parte de lo que marca la balanza es masa magra, no grasa. ${r0(brecha)} g son un huevo y medio, o 100 g de pollo, o un puñado de atún.`,
       evidencia: [
         `promedio ${r0(promedio)} g de ${objetivo.proteinaG}`,
         `${cumplidos} de ${dias.length} días al 90 % o más`,

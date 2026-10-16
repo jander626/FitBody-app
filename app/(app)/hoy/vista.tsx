@@ -64,6 +64,7 @@ export function VistaHoy({
   hoy,
   semana,
   registrados,
+  racha,
   consejo,
 }: {
   dia: Dia;
@@ -73,6 +74,8 @@ export function VistaHoy({
   semana: string[];
   /** De esas fechas, las que tienen comidas. */
   registrados: string[];
+  /** Días seguidos con registro, contando hasta hoy. */
+  racha: number;
   /** El más urgente de la semana. Null en días pasados. */
   consejo: Consejo | null;
 }) {
@@ -96,6 +99,12 @@ export function VistaHoy({
           >
             {esHoy ? "Hoy" : enPalabras(dia.fecha)}
           </Link>
+          <span className="ml-auto flex items-center gap-1 text-sm font-medium text-ink-2" aria-label={`Racha de ${racha} ${racha === 1 ? "día" : "días"}`}>
+            <span className={racha > 0 ? "respira" : "opacity-30 grayscale"} aria-hidden="true">
+              🔥
+            </span>
+            <span className="font-mono tabular-nums">{racha}</span>
+          </span>
           <Link
             href="/perfil"
             aria-label="Perfil"

@@ -37,6 +37,10 @@ export function NavegacionInferior() {
   const indiceActivo = COLUMNAS.findIndex((c) => c !== null && estaEn(c.href));
   const registrando = estaEn("/registrar");
 
+  // Registrar es una pantalla de captura con su propia barra de modos: la
+  // general se esconde para no apilar dos barras una sobre otra.
+  if (registrando) return null;
+
   return (
     <nav
       aria-label="Principal"
@@ -61,7 +65,6 @@ export function NavegacionInferior() {
               key="registrar"
               href="/registrar"
               aria-label="Registrar"
-              aria-current={registrando ? "page" : undefined}
               className="relative -my-5 mx-auto flex size-14 items-center justify-center rounded-full bg-accent text-sobre-accent shadow-[var(--shadow)]"
             >
               <MasIcono />

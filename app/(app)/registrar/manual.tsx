@@ -28,6 +28,8 @@ export function RegistroManual({
   alimentos,
   fecha,
   momentoInicial,
+  modo,
+  alCambiarModo,
   objetivo,
   consumido,
 }: {
@@ -35,6 +37,10 @@ export function RegistroManual({
   fecha: string;
   /** La comida desde la que se llegó (el "+" de Hoy); si no, se sugiere por hora. */
   momentoInicial?: (typeof MOMENTOS)[number];
+  /** "buscar" muestra la tabla; "codigo" abre el lector de códigos de barras. */
+  modo: "buscar" | "codigo";
+  /** Para salir del lector (al cerrar o al agregar un producto). */
+  alCambiarModo: (modo: "buscar") => void;
   objetivo: Totales | null;
   consumido: Totales;
 }) {
@@ -91,6 +97,8 @@ export function RegistroManual({
       },
     ]);
     setEscaner(null);
+    // Con el producto ya en "Por guardar", se vuelve a la lista para verlo.
+    alCambiarModo("buscar");
   }
 
   function guardar() {
@@ -183,22 +191,16 @@ export function RegistroManual({
         </div>
       )}
 
-      <div>
-        <TituloSeccion>Producto empacado</TituloSeccion>
-        {escaner === null ? (
-          <button
-            type="button"
-            onClick={() => setEscaner({ codigo: null })}
-            className="w-full rounded-xl border border-hairline bg-surface px-4 py-3 text-sm text-ink"
-          >
-            Escanear código de barras
-          </button>
-        ) : (
+      {modo === "codigo" && (
+        <div>
           <Tarjeta>
-            {escaner.codigo === null ? (
+            {escaner?.codigo == null ? (
               <EscanerCodigo
                 onCodigo={(codigo) => setEscaner({ codigo })}
-                onCerrar={() => setEscaner(null)}
+                onCerrar={() => {
+                  setEscaner(null);
+                  alCambiarModo("buscar");
+                }}
               />
             ) : (
               <ProductoEscaneadoCard
@@ -208,10 +210,10 @@ export function RegistroManual({
               />
             )}
           </Tarjeta>
-        )}
-      </div>
+        </div>
+      )}
 
-      <div>
+      <div className={modo === "buscar" ? undefined : "hidden"}>
         <TituloSeccion>Buscar en la tabla</TituloSeccion>
         <input
           type="search"

@@ -1,9 +1,10 @@
 "use client";
 
 import { useActionState, useState, useTransition } from "react";
-import Link from "next/link";
-import { Aviso, Campo, Encabezado, Tarjeta, TituloSeccion, claseControl } from "@/components/ui";
+import { Aviso, Tarjeta, TituloSeccion } from "@/components/ui";
 import { GraficoPeso } from "@/components/grafico-peso";
+import { useCuenta } from "@/components/movimiento";
+import { SelectorNumero } from "@/components/selector-numero";
 import type { EstadoPeso } from "@/lib/datos/peso";
 import { aceptarAjuste, guardarPeso, type Resultado } from "./acciones";
 
@@ -14,24 +15,7 @@ export function VistaPeso({
   estado: EstadoPeso;
   fecha: string;
 }) {
-  const [resultado, accionGuardar, guardando] = useActionState<
-    Resultado | null,
-    FormData
-  >(guardarPeso, null);
-
-  const {
-    serie,
-    pesoDeHoy,
-    pesoMetaKg,
-    ajuste,
-    ritmoEsperadoKgSemana,
-    cintura,
-    cinturaDeHoy,
-    composicion,
-    ratio,
-  } = estado;
-
-  const ultimaCintura = cintura.at(-1);
+  const { serie, pesoDeHoy, pesoMetaKg, ajuste, ritmoEsperadoKgSemana } = estado;
 
   const ultimo = serie.at(-1);
   // La media móvil más reciente que exista. Los primeros días no tienen, así
@@ -40,109 +24,31 @@ export function VistaPeso({
     (ultima, p) => (p.mediaKg !== null ? p.mediaKg : ultima),
     null,
   );
+  // El primer punto con media: contra él se mide cuánto se ha movido.
+  const primera = serie.find((p) => p.mediaKg !== null);
+  const cambio =
+    tendencia !== null && primera?.mediaKg != null ? tendencia - primera.mediaKg : null;
 
   return (
     <>
-      <Encabezado
-        titulo="Peso"
-        bajada={
-          tendencia !== null
-            ? `Tendencia: ${tendencia.toFixed(1)} kg`
-            : "Pesate en ayunas, siempre en las mismas condiciones."
-        }
-      />
+      <header className="px-5 pt-8 pb-2">
+        <p className="entra text-sm text-muted">Tendencia de peso</p>
+        {tendencia !== null ? (
+          <Tendencia valor={tendencia} cambio={cambio} desde={primera?.fecha ?? null} metaKg={pesoMetaKg} />
+        ) : (
+          <p className="entra mt-1 text-sm text-ink-2" style={{ "--i": 1 } as React.CSSProperties}>
+            Pésate unos días seguidos, en ayunas, y aquí aparece tu tendencia.
+          </p>
+        )}
+      </header>
 
-      <div className="space-y-6 px-5">
-        <Tarjeta>
-          <form action={accionGuardar}>
-            <input type="hidden" name="fecha" value={fecha} />
-            <Campo
-              etiqueta={pesoDeHoy !== null ? "Peso de hoy (ya registrado)" : "Peso de hoy"}
-              // Un valor rellenado se ve idéntico a uno guardado, y la
-              // diferencia estaba solo en la etiqueta y el botón — fácil de
-              // pasar por alto, y lleva a creer que se guardó cuando no.
-              ayuda={
-                pesoDeHoy !== null
-                  ? "En ayunas y en las mismas condiciones. Un segundo pesaje corrige al primero."
-                  : ultimo
-                    ? `Todavía sin registrar. El ${ultimo.fecha.slice(5)} pesaste ${ultimo.pesoKg} kg: cambialo y tocá Guardar.`
-                    : "En ayunas y en las mismas condiciones."
-              }
-            >
-              <input
-                name="pesoKg"
-                type="number"
-                required
-                min={20}
-                max={400}
-                step={0.1}
-                inputMode="decimal"
-                defaultValue={pesoDeHoy ?? ultimo?.pesoKg ?? ""}
-                className={claseControl}
-              />
-            </Campo>
-
-            {/*
-              Vacío por defecto y nunca prellenado con la medida anterior: un
-              número que ya está ahí invita a guardarlo sin medir, y una medida
-              inventada contamina la lectura durante semanas. El peso sí se
-              prellena porque cambia poco; la cintura, si no la mediste hoy,
-              mejor que quede vacía.
-            */}
-            <Campo
-              etiqueta={
-                cinturaDeHoy !== null
-                  ? "Cintura (ya registrada hoy)"
-                  : "Cintura, en cm — opcional"
-              }
-              ayuda={
-                cinturaDeHoy !== null
-                  ? "Dejala vacía si solo venís a corregir el peso: no se borra."
-                  : "Una vez por semana alcanza. En ayunas, de pie, a la altura del ombligo, después de soltar el aire y sin meter la panza."
-              }
-            >
-              <input
-                name="cinturaCm"
-                type="number"
-                min={40}
-                max={250}
-                step={0.1}
-                inputMode="decimal"
-                placeholder={
-                  ultimaCintura ? `la última fue ${ultimaCintura.cinturaCm}` : "94.5"
-                }
-                defaultValue={cinturaDeHoy ?? ""}
-                className={claseControl}
-              />
-            </Campo>
-
-            <button
-              type="submit"
-              disabled={guardando}
-              className="mt-3 w-full rounded-xl bg-accent px-4 py-3 text-base font-medium text-sobre-accent disabled:opacity-50"
-            >
-              {guardando
-                ? "Guardando…"
-                : pesoDeHoy !== null
-                  ? "Corregir el de hoy"
-                  : "Guardar"}
-            </button>
-
-            {resultado?.ok === true && (
-              <div className="mt-3">
-                <Aviso nivel="bien">{resultado.mensaje}</Aviso>
-              </div>
-            )}
-            {resultado?.ok === false && (
-              <div className="mt-3">
-                <Aviso nivel="error">{resultado.error}</Aviso>
-              </div>
-            )}
-          </form>
-        </Tarjeta>
+      <div className="space-y-5 px-5 pt-3">
+        <div className="entra" style={{ "--i": 2 } as React.CSSProperties}>
+          <RegistroDePeso fecha={fecha} pesoDeHoy={pesoDeHoy} ultimoKg={ultimo?.pesoKg ?? null} />
+        </div>
 
         {serie.length > 0 && (
-          <div>
+          <div className="entra" style={{ "--i": 3 } as React.CSSProperties}>
             <TituloSeccion>Trayectoria</TituloSeccion>
             <Tarjeta>
               <GraficoPeso serie={serie} pesoMetaKg={pesoMetaKg} />
@@ -150,115 +56,132 @@ export function VistaPeso({
           </div>
         )}
 
-        <div>
-          <TituloSeccion>Cintura</TituloSeccion>
-          <TarjetaComposicion
-            composicion={composicion}
-            medidas={cintura}
-            ratio={ratio}
-          />
-        </div>
-
         {ajuste && (
-          <div>
+          <div className="entra" style={{ "--i": 4 } as React.CSSProperties}>
             <TituloSeccion>Ajuste semanal</TituloSeccion>
-            <TarjetaAjuste
-              ajuste={ajuste}
-              ritmo={ritmoEsperadoKgSemana}
-            />
+            <TarjetaAjuste ajuste={ajuste} ritmo={ritmoEsperadoKgSemana} />
           </div>
         )}
-
-        {/* La importación del reloj vivía solo detrás de un enlace en
-            Historial y no se encontraba. Va acá porque es parte de la misma
-            rutina semanal: pesarse, medirse y traer el gasto del reloj. */}
-        <div>
-          <TituloSeccion>Gasto del reloj</TituloSeccion>
-          <Tarjeta>
-            <p className="text-sm text-ink-2">
-              Importá el CSV de Garmin Connect y el déficit de cada día se
-              calcula contra el gasto que midió el reloj, no contra la fórmula.
-            </p>
-            <Link
-              href="/garmin"
-              className="mt-3 block rounded-xl border border-hairline px-4 py-2.5 text-center text-sm text-ink-2"
-            >
-              Importar desde Garmin
-            </Link>
-          </Tarjeta>
-        </div>
       </div>
     </>
   );
 }
 
-/**
- * Lo que dicen la cintura y el peso juntos.
- *
- * Sin color de "bien" o "mal": la misma lectura es buena o mala según lo que
- * estés buscando —subir de peso sin ensanchar es excelente para quien gana
- * músculo y alarmante para quien baja grasa—. La app describe; el juicio es
- * de quien lee.
- */
-function TarjetaComposicion({
-  composicion,
-  medidas,
-  ratio,
+/** El número grande, que sube hasta su valor, y cuánto se ha movido. */
+function Tendencia({
+  valor,
+  cambio,
+  desde,
+  metaKg,
 }: {
-  composicion: EstadoPeso["composicion"];
-  medidas: EstadoPeso["cintura"];
-  ratio: EstadoPeso["ratio"];
+  valor: number;
+  cambio: number | null;
+  desde: string | null;
+  metaKg: number | null;
 }) {
-  const { titulo, detalle, deltaCinturaCm, deltaPesoKg, dias } = composicion;
+  const animado = useCuenta(valor, 900);
+  const fmt = (n: number) => n.toFixed(1).replace(".", ",");
+  const baja = cambio !== null && cambio < -0.05;
+  const sube = cambio !== null && cambio > 0.05;
+  // Si la meta es bajar, bajar es "bien"; si no hay meta, no se juzga.
+  const buscaBajar = metaKg !== null && metaKg < valor;
+  const bien = (baja && buscaBajar) || (sube && metaKg !== null && metaKg > valor);
 
   return (
-    <Tarjeta>
-      <p className="font-medium text-ink">{titulo}</p>
-      <p className="mt-1.5 text-sm text-ink-2">{detalle}</p>
-
-      {ratio && (
-        // Cintura sobre estatura: la regla es "menos de la mitad". Distingue
-        // mejor que el IMC, que con 61 kg de masa magra da "sobrepeso" y no
-        // significa nada.
-        <p className="mt-2.5 text-sm text-ink-2">
-          Cintura sobre estatura:{" "}
-          <span className="font-mono tabular-nums">
-            {ratio.ratio.toFixed(3)}
+    <div className="entra" style={{ "--i": 1 } as React.CSSProperties}>
+      <p className="mt-1 flex items-baseline gap-2">
+        <span className="font-mono text-6xl font-semibold tracking-tight text-ink tabular-nums">
+          {fmt(animado)}
+        </span>
+        <span className="text-xl text-muted">kg</span>
+      </p>
+      <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+        {cambio !== null && (baja || sube) && (
+          <span
+            className={`pop inline-flex items-center gap-1 rounded-full px-3 py-1 font-medium ${
+              bien ? "bg-good-bg text-good" : "bg-hairline-soft text-ink-2"
+            }`}
+          >
+            {baja ? "↓" : "↑"} {fmt(Math.abs(cambio))} kg
           </span>
-          {ratio.bajoUmbral
-            ? " — por debajo de 0.50, que es el umbral."
-            : ` — faltan ${ratio.cmParaUmbral.toFixed(1)} cm para bajar de 0.50.`}
-        </p>
-      )}
-
-      {deltaCinturaCm !== null && (
-        <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 border-t border-hairline-soft pt-3 font-mono text-xs text-muted tabular-nums">
-          <span>
-            cintura {conSigno(deltaCinturaCm)} cm
-            {dias !== null && ` en ${dias} d`}
+        )}
+        {desde && <span className="text-muted">desde el {desde.slice(8)}/{desde.slice(5, 7)}</span>}
+        {metaKg !== null && (
+          <span className="text-muted">
+            · meta {fmt(metaKg)} kg
           </span>
-          {deltaPesoKg !== null && <span>peso {conSigno(deltaPesoKg)} kg</span>}
-        </div>
-      )}
-
-      {medidas.length > 1 && (
-        <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
-          {/* Las últimas seis, de la más vieja a la más nueva: la serie cruda
-              al lado de la interpretación, para poder desconfiar de ella. */}
-          {medidas.slice(-6).map((m) => (
-            <li key={m.fecha} className="font-mono tabular-nums">
-              {m.fecha.slice(5)} · {m.cinturaCm}
-            </li>
-          ))}
-        </ul>
-      )}
-    </Tarjeta>
+        )}
+      </div>
+    </div>
   );
 }
 
-/** Un "+" explícito: sin él, −2 y 2 se leen distinto de un vistazo. */
-function conSigno(n: number): string {
-  return `${n > 0 ? "+" : n < 0 ? "−" : "±"}${Math.abs(n).toFixed(1)}`;
+/**
+ * Anotar el peso de hoy deslizando.
+ *
+ * Arranca en lo último que pesaste: el peso cambia poco entre días, y mover
+ * el deslizador unas décimas es más rápido y menos propenso a errores que
+ * teclear. El botón dice si guarda o corrige, porque un valor ya puesto se ve
+ * igual a uno guardado y era fácil creer que se había guardado sin tocar nada.
+ */
+function RegistroDePeso({
+  fecha,
+  pesoDeHoy,
+  ultimoKg,
+}: {
+  fecha: string;
+  pesoDeHoy: number | null;
+  ultimoKg: number | null;
+}) {
+  const [resultado, accionGuardar, guardando] = useActionState<Resultado | null, FormData>(
+    guardarPeso,
+    null,
+  );
+  const [valor, setValor] = useState(pesoDeHoy ?? ultimoKg ?? 70);
+
+  return (
+    <Tarjeta>
+      <form action={accionGuardar} className="space-y-5">
+        <input type="hidden" name="fecha" value={fecha} />
+        <input type="hidden" name="pesoKg" value={valor} />
+
+        <div>
+          <p className="font-medium text-ink">{pesoDeHoy !== null ? "Tu peso de hoy" : "¿Cuánto pesas hoy?"}</p>
+          <p className="mt-0.5 text-xs text-muted">
+            {pesoDeHoy !== null
+              ? "Ya está registrado. Un segundo pesaje corrige al primero."
+              : "En ayunas y en las mismas condiciones, para que se pueda comparar."}
+          </p>
+        </div>
+
+        <SelectorNumero
+          etiqueta="peso"
+          unidad="kg"
+          valor={valor}
+          min={30}
+          max={250}
+          paso={0.1}
+          decimales={1}
+          onCambiar={setValor}
+        />
+
+        <button
+          type="submit"
+          disabled={guardando}
+          className="w-full rounded-full bg-accent px-5 py-4 text-base font-semibold text-sobre-accent disabled:opacity-50"
+        >
+          {guardando ? "Guardando…" : pesoDeHoy !== null ? "Corregir el de hoy" : "Guardar"}
+        </button>
+
+        {resultado?.ok === true && (
+          <div className="pop">
+            <Aviso nivel="bien">{resultado.mensaje}</Aviso>
+          </div>
+        )}
+        {resultado?.ok === false && <Aviso nivel="error">{resultado.error}</Aviso>}
+      </form>
+    </Tarjeta>
+  );
 }
 
 function TarjetaAjuste({
@@ -301,7 +224,7 @@ function TarjetaAjuste({
                 setResultado(await aceptarAjuste(ajuste.kcalPropuesto)),
               )
             }
-            className="mt-3 w-full rounded-xl bg-accent px-4 py-3 text-base font-medium text-sobre-accent disabled:opacity-50"
+            className="mt-3 w-full rounded-full bg-accent px-5 py-4 text-base font-semibold text-sobre-accent disabled:opacity-50"
           >
             {aplicando ? "Aplicando…" : "Aceptar el ajuste"}
           </button>

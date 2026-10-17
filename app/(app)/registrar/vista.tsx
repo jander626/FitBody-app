@@ -4,7 +4,7 @@ import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { CamaraFoto } from "@/components/camara-foto";
+import { CapturaFoto } from "@/components/captura-foto";
 import { useHidratado } from "@/components/hidratado";
 import { PantallaRegistrada } from "@/components/pantalla-registrada";
 import type { Alimento } from "@/lib/alimentos";
@@ -102,7 +102,9 @@ export function VistaRegistrar({
       <div className="px-5 pb-4">
         {modo === "foto" && revisado && (
           <div className="entra pt-2">
-            <CamaraFoto
+            <CapturaFoto
+              titulo="Toma una foto de tu comida"
+              ayuda="Se abre la cámara de tu teléfono."
               onFoto={(archivo) => {
                 setFoto((previa) => ({ archivo, n: (previa?.n ?? 0) + 1 }));
                 // Con la foto tomada se pasa al panel donde se ve y se estima.

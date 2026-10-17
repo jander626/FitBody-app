@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { usePathname } from "next/navigation";
 
 /**
@@ -29,7 +30,13 @@ const DERECHA = [
 const COLUMNAS = [...IZQUIERDA, null, ...DERECHA] as const;
 
 export function NavegacionInferior() {
-  const pathname = usePathname();
+  const real = usePathname();
+  // Al tocar un destino, la pastilla se mueve de una vez, sin esperar a que el
+  // servidor entregue la pantalla. Si la navegación termina en otra parte (o
+  // falla), `real` manda: solo se respeta lo pendiente mientras siga siendo
+  // el mismo punto de partida.
+  const [pendiente, setPendiente] = useState<{ href: string; desde: string } | null>(null);
+  const pathname = pendiente && pendiente.desde === real ? pendiente.href : real;
   const estaEn = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
 
   // Perfil y Garmin no tienen botón en la barra: ahí no hay ninguna activa y la
@@ -65,6 +72,7 @@ export function NavegacionInferior() {
             <Link
               key="registrar"
               href="/registrar"
+              onClick={() => setPendiente({ href: "/registrar", desde: real })}
               aria-label="Registrar"
               className="relative -my-5 mx-auto flex size-14 items-center justify-center rounded-full bg-accent text-sobre-accent shadow-[var(--shadow)]"
             >
@@ -74,6 +82,7 @@ export function NavegacionInferior() {
             <Link
               key={destino.href}
               href={destino.href}
+              onClick={() => setPendiente({ href: destino.href, desde: real })}
               aria-current={i === indiceActivo ? "page" : undefined}
               className={`relative flex flex-col items-center gap-0.5 rounded-full py-2 text-[10px] transition-colors ${
                 i === indiceActivo ? "font-medium text-accent" : "text-muted"

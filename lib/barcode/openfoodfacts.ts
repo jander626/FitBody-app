@@ -20,10 +20,16 @@ export interface ProductoEscaneado {
   g100: number;
   /** Tamaño de una porción en gramos o ml, si el producto lo declara. */
   porcionG: number | null;
+  /**
+   * El alimento de la tabla propia, si el producto ya está guardado. Con él, el
+   * ítem de la comida queda enlazado y cambiar la porción recalcula desde la
+   * tabla, igual que con cualquier otro alimento.
+   */
+  foodId?: string | null;
 }
 
 export type ResultadoProducto =
-  | { estado: "ok"; producto: ProductoEscaneado }
+  | { estado: "ok"; producto: ProductoEscaneado; origen: "propio" | "openfoodfacts" }
   | { estado: "no_encontrado" }
   | { estado: "sin_nutricion"; nombre: string | null };
 
@@ -77,6 +83,7 @@ export function parsearProducto(codigo: string, json: unknown): ResultadoProduct
 
   return {
     estado: "ok",
+    origen: "openfoodfacts",
     producto: {
       codigo,
       nombre,

@@ -27,7 +27,7 @@ import {
 import { guardarComida } from "./acciones";
 
 export function RegistroManual({
-  alimentos,
+  alimentos: alimentosBase,
   fecha,
   momentoInicial,
   modo,
@@ -65,6 +65,10 @@ export function RegistroManual({
   // null = cerrado; sin código = cámara abierta; con código = ya se leyó uno.
   const [escaner, setEscaner] = useState<{ codigo: string | null } | null>(null);
   const [guardando, iniciarGuardado] = useTransition();
+  // Productos guardados en esta sesión: la página no se vuelve a pedir, así que
+  // se suman a mano para que el editor pueda reescalar su porción.
+  const [propios, setPropios] = useState<Alimento[]>([]);
+  const alimentos = useMemo(() => [...alimentosBase, ...propios], [alimentosBase, propios]);
 
   const resultados = useMemo(
     () => buscarAlimentos(alimentos, consulta),
@@ -96,16 +100,36 @@ export function RegistroManual({
   }
 
   function agregarProducto(producto: ProductoEscaneado, gramos: number) {
+    const nombre = producto.marca ? `${producto.nombre} (${producto.marca})` : producto.nombre;
+    const foodId = producto.foodId ?? null;
+    if (foodId) {
+      setPropios((previos) =>
+        previos.some((a) => a.id === foodId)
+          ? previos
+          : [
+              ...previos,
+              {
+                id: foodId,
+                slug: foodId,
+                nombre,
+                categoria: "Producto empacado",
+                kcal100: producto.kcal100,
+                p100: producto.p100,
+                c100: producto.c100,
+                g100: producto.g100,
+                porcionG: producto.porcionG,
+                porcionNota: null,
+              },
+            ],
+      );
+    }
     setItems((previos) => [
       ...previos,
       {
         clave: `${producto.codigo}-${Date.now()}`,
-        // Sin enlace a la tabla: el producto no es un alimento propio, y así
-        // cambiar la porción reescala lo que ya está calculado.
-        foodId: null,
-        alimento: producto.marca
-          ? `${producto.nombre} (${producto.marca})`
-          : producto.nombre,
+        // Con enlace cuando el producto quedó guardado en la tabla propia.
+        foodId,
+        alimento: nombre,
         porcionG: gramos,
         porcionMl: null,
         nota: `Código de barras ${producto.codigo}`,

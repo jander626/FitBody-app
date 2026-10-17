@@ -1,18 +1,19 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { esCodigoValido } from "@/lib/barcode/openfoodfacts";
+import { leerCodigoDeFoto } from "@/lib/barcode/leer-foto";
+import { CapturaFoto } from "@/components/captura-foto";
 import { claseControl } from "@/components/ui";
 
 /**
- * Lector de códigos de barras con la cámara.
+ * Leer un código de barras: una foto del código, o escribir el número.
  *
- * Usa ZXing en vez de `BarcodeDetector` porque Safari en iPhone no lo tiene, y
- * ahí es donde más se va a usar. La librería se carga solo al abrir el lector,
- * para no sumar peso a quien nunca escanea.
- *
- * Siempre hay una salida sin cámara —escribir el número—: el permiso puede
- * estar negado, o el código puede estar rayado o muy chico para el lente.
+ * Es una foto y no la cámara en vivo a propósito: la cámara en vivo pide
+ * permiso al navegador una y otra vez en el iPhone, y la del sistema no. Para
+ * que salga bien, la foto tiene que tener el código grande y con luz —se dice
+ * en pantalla—; y si no sale, escribir el número, que está debajo de las barras,
+ * siempre funciona.
  */
 export function EscanerCodigo({
   onCodigo,
@@ -21,68 +22,28 @@ export function EscanerCodigo({
   onCodigo: (codigo: string) => void;
   onCerrar: () => void;
 }) {
-  const video = useRef<HTMLVideoElement>(null);
+  const [leyendo, setLeyendo] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
   const [manual, setManual] = useState("");
 
-  // Los callbacks cambian en cada render del padre; el efecto solo debe correr
-  // una vez, o la cámara se reiniciaría a cada tecla.
-  const alCodigo = useRef(onCodigo);
-  useEffect(() => {
-    alCodigo.current = onCodigo;
-  });
-
-  useEffect(() => {
-    let detener: (() => void) | null = null;
-    let cancelado = false;
-
-    async function iniciar() {
-      if (!navigator.mediaDevices?.getUserMedia) {
-        setAviso("Este navegador no deja usar la cámara. Escribí el número abajo.");
+  async function alFoto(archivo: File) {
+    setAviso(null);
+    setLeyendo(true);
+    try {
+      const codigo = await leerCodigoDeFoto(archivo);
+      if (codigo) {
+        onCodigo(codigo);
         return;
       }
-      try {
-        const [{ BrowserMultiFormatReader }, { BarcodeFormat, DecodeHintType }] =
-          await Promise.all([import("@zxing/browser"), import("@zxing/library")]);
-        if (cancelado || !video.current) return;
-
-        const pistas = new Map();
-        pistas.set(DecodeHintType.POSSIBLE_FORMATS, [
-          BarcodeFormat.EAN_13,
-          BarcodeFormat.EAN_8,
-          BarcodeFormat.UPC_A,
-          BarcodeFormat.UPC_E,
-        ]);
-
-        const lector = new BrowserMultiFormatReader(pistas);
-        const controles = await lector.decodeFromConstraints(
-          { video: { facingMode: { ideal: "environment" } } },
-          video.current,
-          (resultado) => {
-            const codigo = resultado?.getText();
-            if (codigo && esCodigoValido(codigo)) {
-              controles?.stop();
-              alCodigo.current(codigo);
-            }
-          },
-        );
-        if (cancelado) controles.stop();
-        else detener = () => controles.stop();
-      } catch {
-        if (!cancelado) {
-          setAviso(
-            "No pude abrir la cámara. Revisá el permiso del navegador o escribí el número abajo.",
-          );
-        }
-      }
+      setAviso(
+        "No pude leer el código en esa foto. Acércate hasta que las barras ocupen buena parte de la imagen, con buena luz y sin reflejos, o escribe el número de abajo.",
+      );
+    } catch {
+      setAviso("No pude procesar la foto. Intenta de nuevo o escribe el número de abajo.");
+    } finally {
+      setLeyendo(false);
     }
-
-    void iniciar();
-    return () => {
-      cancelado = true;
-      detener?.();
-    };
-  }, []);
+  }
 
   function enviarManual() {
     const codigo = manual.replace(/\s/g, "");
@@ -94,19 +55,19 @@ export function EscanerCodigo({
   }
 
   return (
-    <div className="space-y-3">
-      <div className="overflow-hidden rounded-xl bg-black">
-        <video
-          ref={video}
-          playsInline
-          muted
-          className="aspect-[4/3] w-full object-cover"
+    <div className="space-y-4">
+      {leyendo ? (
+        <p className="py-10 text-center text-sm text-ink-2" aria-live="polite">
+          Buscando el código en la foto…
+        </p>
+      ) : (
+        <CapturaFoto
+          emoji="▌▌▎▌"
+          titulo="Fotografía el código de barras"
+          ayuda="Que las barras se vean grandes y nítidas, con buena luz."
+          onFoto={alFoto}
         />
-      </div>
-      <p className="text-xs text-muted">
-        Apuntá al código de barras del empaque, con buena luz y sin acercar
-        demasiado.
-      </p>
+      )}
 
       {aviso && <p className="text-sm text-ink-2">{aviso}</p>}
 
@@ -116,7 +77,7 @@ export function EscanerCodigo({
           inputMode="numeric"
           value={manual}
           onChange={(e) => setManual(e.target.value)}
-          placeholder="O escribí el número"
+          placeholder="O escribe el número"
           aria-label="Número del código de barras"
           className={`${claseControl} mt-0 flex-1`}
         />

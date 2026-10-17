@@ -33,6 +33,34 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Ese código no es válido." }, { status: 400 });
   }
 
+  // Primero lo propio: un producto que ya se guardó sale al instante, sin red y
+  // sin depender de que Open Food Facts lo tenga. El RLS ya limita la consulta
+  // a los alimentos de esta persona.
+  const { data: propio } = await supabase
+    .from("foods")
+    .select("id, nombre, kcal100, p100, c100, g100, porcion_g")
+    .eq("codigo_barras", codigo)
+    .eq("creado_por", user.id)
+    .maybeSingle();
+
+  if (propio) {
+    return NextResponse.json({
+      estado: "ok",
+      origen: "propio",
+      producto: {
+        codigo,
+        nombre: propio.nombre,
+        marca: null,
+        kcal100: Number(propio.kcal100),
+        p100: Number(propio.p100),
+        c100: Number(propio.c100),
+        g100: Number(propio.g100),
+        porcionG: propio.porcion_g === null ? null : Number(propio.porcion_g),
+        foodId: propio.id,
+      },
+    });
+  }
+
   let respuesta: Response;
   try {
     respuesta = await fetch(

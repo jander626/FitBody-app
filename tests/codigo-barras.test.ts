@@ -36,6 +36,7 @@ describe("parsearProducto", () => {
     const r = parsearProducto("7702004003508", COMPLETO);
     expect(r).toEqual({
       estado: "ok",
+      origen: "openfoodfacts",
       producto: {
         codigo: "7702004003508",
         nombre: "Galletas de vainilla",

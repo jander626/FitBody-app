@@ -6,9 +6,11 @@ import {
   elegirProveedor,
   NOMBRES,
   type NombreProveedor,
+  type FotoEtiqueta,
   type PeticionEstimacion,
   type Proveedor,
   type ResultadoEstimacion,
+  type ResultadoLecturaEtiqueta,
 } from "./proveedor";
 
 /**
@@ -64,6 +66,11 @@ export async function estimar(
   peticion: PeticionEstimacion,
 ): Promise<ResultadoEstimacion> {
   return proveedorActivo().estimar(peticion);
+}
+
+/** Lee la tabla nutricional de una foto con el modelo configurado. */
+export async function leerEtiqueta(foto: FotoEtiqueta): Promise<ResultadoLecturaEtiqueta> {
+  return proveedorActivo().leerEtiqueta(foto);
 }
 
 export { NOMBRES };

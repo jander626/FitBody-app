@@ -120,6 +120,58 @@ insert into public.foods (slug, nombre, categoria, kcal100, p100, c100, g100,
 values ('sancocho-de-la-abuela', 'Sancocho de la abuela', 'Proteina animal',
         120, 8, 10, 5, false, '11111111-1111-1111-1111-111111111111');
 
+-- Un producto escaneado de Ana, con su codigo de barras.
+insert into public.foods (slug, nombre, categoria, kcal100, p100, c100, g100,
+                          publico, creado_por, codigo_barras)
+values ('galletas-7702004003508-11111111', 'Galletas de Ana', 'Producto empacado',
+        467, 6.7, 70, 16.7, false, '11111111-1111-1111-1111-111111111111',
+        '7702004003508');
+
+-- Un codigo que no es un EAN/UPC no se guarda.
+do $$
+begin
+  begin
+    insert into public.foods (slug, nombre, categoria, kcal100, p100, c100, g100,
+                              publico, creado_por, codigo_barras)
+    values ('codigo-malo', 'Malo', 'Producto empacado', 1, 1, 1, 1, false,
+            '11111111-1111-1111-1111-111111111111', '12345');
+    raise exception 'FALLO: se guardo un codigo de barras invalido';
+  exception
+    when check_violation then null;  -- lo esperado
+  end;
+end;
+$$;
+
+-- El mismo codigo dos veces para la misma persona no se duplica.
+do $$
+begin
+  begin
+    insert into public.foods (slug, nombre, categoria, kcal100, p100, c100, g100,
+                              publico, creado_por, codigo_barras)
+    values ('galletas-repetidas', 'Galletas otra vez', 'Producto empacado', 1, 1, 1, 1,
+            false, '11111111-1111-1111-1111-111111111111', '7702004003508');
+    raise exception 'FALLO: Ana pudo guardar dos veces el mismo codigo';
+  exception
+    when unique_violation then null;  -- lo esperado
+  end;
+end;
+$$;
+
+-- Y Ana no puede escribir la libreta de lecturas de etiqueta de Beto.
+do $$
+begin
+  begin
+    insert into public.label_scans (user_id, modelo)
+    values ('22222222-2222-2222-2222-222222222222', 'x');
+    raise exception 'FALLO: Ana escribio una lectura de etiqueta a nombre de Beto';
+  exception
+    when insufficient_privilege or check_violation then null;  -- lo esperado
+  end;
+end;
+$$;
+insert into public.label_scans (user_id, modelo, costo_usd)
+values ('11111111-1111-1111-1111-111111111111', 'gemini-test', 0.001);
+
 
 -- ----------------------------------------------------------- como Beto ---
 
@@ -145,6 +197,26 @@ begin
   assert n = 1, 'Beto no ve el alimento publico';
 end;
 $$;
+
+-- Beto no ve el producto escaneado de Ana, ni lo encuentra por su codigo, ni
+-- ve sus lecturas de etiqueta.
+do $$
+declare n integer;
+begin
+  select count(*) into n from public.foods where codigo_barras = '7702004003508';
+  assert n = 0, 'FUGA: Beto encuentra por codigo de barras un producto de Ana';
+
+  select count(*) into n from public.label_scans;
+  assert n = 0, 'FUGA: Beto ve las lecturas de etiqueta de Ana';
+end;
+$$;
+
+-- Y puede guardar el mismo codigo para si mismo: la unicidad es por persona.
+insert into public.foods (slug, nombre, categoria, kcal100, p100, c100, g100,
+                          publico, creado_por, codigo_barras)
+values ('galletas-7702004003508-22222222', 'Galletas de Beto', 'Producto empacado',
+        450, 6, 68, 15, false, '22222222-2222-2222-2222-222222222222',
+        '7702004003508');
 
 
 -- ------------------------------------------------------- sin sesión ---

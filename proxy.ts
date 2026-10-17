@@ -59,11 +59,13 @@ export async function proxy(request: NextRequest) {
     },
   });
 
-  // getUser() valida el token contra el servidor de auth. No reemplazar por
-  // getSession(), que solo lee la cookie y da por buena cualquier firma.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // getClaims() verifica la firma del token y, si venció, lo renueva y escribe
+  // las cookies nuevas. No reemplazar por getSession(), que solo lee la cookie
+  // y da por buena cualquier firma. Con llaves de firma asimétricas se verifica
+  // sin salir del servidor, y este código corre en CADA petición: un viaje de
+  // red menos aquí se nota en todas las pantallas.
+  const { data: claims } = await supabase.auth.getClaims();
+  const user = claims?.claims?.sub ? { id: claims.claims.sub } : null;
 
   const { pathname } = request.nextUrl;
 

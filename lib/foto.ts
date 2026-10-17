@@ -25,13 +25,26 @@ export interface FotoComprimida {
   bytes: number;
 }
 
-/** Reduce y recodifica una foto a JPEG. */
-export async function comprimirFoto(archivo: File): Promise<FotoComprimida> {
+/**
+ * Reduce y recodifica una foto a JPEG.
+ *
+ * Una etiqueta nutricional necesita más lado que un plato: el modelo tiene que
+ * leer letra chica, no reconocer comida, y a 1024 px los números se pegan. Por
+ * eso `lado` se puede subir; el valor por defecto sigue siendo el de la comida.
+ */
+export async function comprimirFoto(
+  archivo: File,
+  opciones: { lado?: number; calidad?: number } = {},
+): Promise<FotoComprimida> {
+  const { lado = LADO_MAXIMO, calidad = CALIDAD } = opciones;
   const bitmap = await createImageBitmap(archivo);
+  // Antes de `close()`: un bitmap cerrado reporta ancho y alto cero.
+  const anchoOriginal = bitmap.width;
+  const altoOriginal = bitmap.height;
 
-  const escala = Math.min(1, LADO_MAXIMO / Math.max(bitmap.width, bitmap.height));
-  const ancho = Math.round(bitmap.width * escala);
-  const alto = Math.round(bitmap.height * escala);
+  const escala = Math.min(1, lado / Math.max(anchoOriginal, altoOriginal));
+  const ancho = Math.round(anchoOriginal * escala);
+  const alto = Math.round(altoOriginal * escala);
 
   const lienzo = document.createElement("canvas");
   lienzo.width = ancho;
@@ -43,7 +56,7 @@ export async function comprimirFoto(archivo: File): Promise<FotoComprimida> {
   bitmap.close();
 
   const blob = await new Promise<Blob | null>((resolver) =>
-    lienzo.toBlob(resolver, "image/jpeg", CALIDAD),
+    lienzo.toBlob(resolver, "image/jpeg", calidad),
   );
   if (!blob) throw new Error("No se pudo comprimir la foto.");
 
@@ -53,8 +66,8 @@ export async function comprimirFoto(archivo: File): Promise<FotoComprimida> {
     base64,
     mediaType: "image/jpeg",
     blob,
-    anchoOriginal: bitmap.width,
-    altoOriginal: bitmap.height,
+    anchoOriginal,
+    altoOriginal,
     bytes: blob.size,
   };
 }

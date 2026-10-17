@@ -1,4 +1,5 @@
 import type { Alimento } from "@/lib/alimentos";
+import type { EtiquetaCruda } from "@/lib/barcode/etiqueta";
 import type { Respuesta } from "./esquema";
 
 /**
@@ -58,6 +59,20 @@ export interface ResultadoEstimacion {
   modelo: string;
 }
 
+/** La foto de una tabla nutricional. */
+export interface FotoEtiqueta {
+  /** JPEG en base64, sin el prefijo data:. */
+  base64: string;
+  mediaType: MediaType;
+}
+
+export interface ResultadoLecturaEtiqueta {
+  etiqueta: EtiquetaCruda;
+  costoUsd: number;
+  latenciaMs: number;
+  modelo: string;
+}
+
 export interface Proveedor {
   /** Identificador corto, el que va en FITFOOD_PROVEEDOR. */
   readonly nombre: NombreProveedor;
@@ -66,6 +81,8 @@ export interface Proveedor {
   /** Variable de entorno con la clave. */
   readonly variableClave: string;
   estimar(peticion: PeticionEstimacion): Promise<ResultadoEstimacion>;
+  /** Lee la tabla nutricional de un empaque. Transcribe, no estima. */
+  leerEtiqueta(foto: FotoEtiqueta): Promise<ResultadoLecturaEtiqueta>;
 }
 
 export const NOMBRES = ["anthropic", "gemini"] as const;

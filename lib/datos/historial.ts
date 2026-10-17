@@ -29,16 +29,23 @@ export interface Historial {
  * y así la misma función de clasificación que usa la vista se puede probar sin
  * una base de datos.
  */
-export async function obtenerHistorial(userId: string): Promise<Historial> {
+export async function obtenerHistorial(
+  userId: string,
+  /** Si se da, solo los días desde esta fecha. Hoy no necesita toda la historia. */
+  desde?: string,
+): Promise<Historial> {
   const supabase = await clienteServidor();
 
   const [comidasRes, objetivoRes, perfilRes, pesoRes, metricasRes] =
     await Promise.all([
-      supabase
-        .from("meal_logs")
-        .select("fecha, meal_log_items (kcal, proteina_g, carbs_g, grasa_g)")
-        .eq("user_id", userId)
-        .order("fecha", { ascending: false }),
+      (() => {
+        const consulta = supabase
+          .from("meal_logs")
+          .select("fecha, meal_log_items (kcal, proteina_g, carbs_g, grasa_g)")
+          .eq("user_id", userId)
+          .order("fecha", { ascending: false });
+        return desde ? consulta.gte("fecha", desde) : consulta;
+      })(),
       supabase
         .from("user_goals")
         .select("kcal, proteina_g, carbs_g, grasa_g, factor_actividad")
@@ -57,11 +64,14 @@ export async function obtenerHistorial(userId: string): Promise<Historial> {
         .order("fecha", { ascending: false })
         .limit(1)
         .maybeSingle(),
-      supabase
-        .from("daily_metrics")
-        .select("fecha, kcal_totales")
-        .eq("user_id", userId)
-        .not("kcal_totales", "is", null),
+      (() => {
+        const consulta = supabase
+          .from("daily_metrics")
+          .select("fecha, kcal_totales")
+          .eq("user_id", userId)
+          .not("kcal_totales", "is", null);
+        return desde ? consulta.gte("fecha", desde) : consulta;
+      })(),
     ]);
 
   // Un día puede tener varias comidas: se suman todas.

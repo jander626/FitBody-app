@@ -1,10 +1,8 @@
 import Link from "next/link";
-import { Aviso, TituloSeccion } from "@/components/ui";
-import { TarjetaConsejo } from "@/components/tarjeta-consejo";
+import { Aviso } from "@/components/ui";
 import { FranjaSemana } from "@/components/franja-semana";
 import { MedidorDia } from "@/components/medidor-dia";
 import type { ComidaDiario, Dia } from "@/lib/datos/diario";
-import type { Consejo } from "@/lib/coach/consejos";
 import { emojiDeAlimento, tituloDeComida } from "@/lib/registro/presentacion";
 
 const NOMBRE_MOMENTO: Record<string, string> = {
@@ -76,8 +74,8 @@ export function VistaHoy({
   registrados: string[];
   /** Días seguidos con registro, contando hasta hoy. */
   racha: number;
-  /** El más urgente de la semana. Null en días pasados. */
-  consejo: Consejo | null;
+  /** El consejo más urgente, ya envuelto en su `<Suspense>`. Null en días pasados. */
+  consejo: React.ReactNode;
 }) {
   const { totales, objetivo, comidas } = dia;
 
@@ -155,18 +153,7 @@ export function VistaHoy({
           </div>
         )}
 
-        {consejo && (
-          <div className="entra" style={{ "--i": 3 } as React.CSSProperties}>
-            {/* Solo el más urgente. Los demás están en /consejos: una lista
-                larga en la pantalla que se abre cuatro veces al día deja de
-                leerse a los tres días. */}
-            <TituloSeccion>Lo que dicen tus datos</TituloSeccion>
-            <TarjetaConsejo consejo={consejo} />
-            <Link href="/consejos" className="mt-2 block py-2 text-center text-sm text-muted">
-              Ver todos los consejos
-            </Link>
-          </div>
-        )}
+        {consejo}
 
         <div className="space-y-3">
           {[...MOMENTOS_FIJOS, ...extras].map((momento, i) => (

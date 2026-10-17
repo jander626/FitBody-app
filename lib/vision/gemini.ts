@@ -3,12 +3,16 @@ import "server-only";
 import { GoogleGenAI, type Content, type Part } from "@google/genai";
 import { costoUsd, esGratis } from "@/lib/guardrails/costos";
 import { aJsonSchema } from "./esquema-json";
+import { EtiquetaSchema } from "@/lib/barcode/etiqueta";
 import { RespuestaSchema } from "./esquema";
+import { INSTRUCCIONES_ETIQUETA } from "./prompt-etiqueta";
 import { contexto, instrucciones, vocabulario } from "./prompt";
 import type {
+  FotoEtiqueta,
   PeticionEstimacion,
   Proveedor,
   ResultadoEstimacion,
+  ResultadoLecturaEtiqueta,
 } from "./proveedor";
 
 /**
@@ -239,6 +243,79 @@ async function estimarCon(
   };
 }
 
+/** Lee una etiqueta, con la misma cadena de modelos de respaldo que `estimar`. */
+async function leerEtiqueta(foto: FotoEtiqueta): Promise<ResultadoLecturaEtiqueta> {
+  const modelos = cadenaDeModelos();
+  let ultimoError: unknown;
+
+  for (const modelo of modelos) {
+    try {
+      return await leerEtiquetaCon(modelo, foto);
+    } catch (err) {
+      if (!vaAlSiguiente(err)) throw err;
+      ultimoError = err;
+    }
+  }
+
+  throw new Error(
+    `Ningún modelo de Gemini pudo leer la etiqueta (probé ${modelos.length}). ` +
+      `Puede que se haya agotado la cuota gratuita del día; escribir los valores a mano sigue funcionando.\n` +
+      `Último error: ${ultimoError instanceof Error ? ultimoError.message.slice(0, 200) : ultimoError}`,
+  );
+}
+
+async function leerEtiquetaCon(modelo: string, foto: FotoEtiqueta): Promise<ResultadoLecturaEtiqueta> {
+  const ai = obtenerCliente();
+  const arranque = Date.now();
+
+  const respuesta = await ai.models.generateContent({
+    model: modelo,
+    contents: [
+      {
+        role: "user",
+        parts: [
+          { inlineData: { mimeType: foto.mediaType, data: foto.base64 } },
+          { text: "Lee la tabla nutricional de esta foto." },
+        ],
+      },
+    ],
+    config: {
+      systemInstruction: INSTRUCCIONES_ETIQUETA,
+      responseMimeType: "application/json",
+      responseJsonSchema: aJsonSchema(EtiquetaSchema),
+      maxOutputTokens: 1500,
+    },
+  });
+
+  if (!respuesta.text) {
+    throw new Error("El modelo no devolvió nada. Intenta con otra foto o escribe los valores.");
+  }
+
+  let crudo: unknown;
+  try {
+    crudo = JSON.parse(respuesta.text);
+  } catch {
+    throw new Error("El modelo devolvió algo que no es JSON. Intenta con otra foto.");
+  }
+  // Se vuelve a validar: que el proveedor prometa la forma no es que la cumpla.
+  const validada = EtiquetaSchema.safeParse(crudo);
+  if (!validada.success) {
+    throw new Error("No pude leer la etiqueta con la forma esperada. Intenta con otra foto o escribe los valores.");
+  }
+
+  const uso = respuesta.usageMetadata;
+  const cacheadas = uso?.cachedContentTokenCount ?? 0;
+  const entrada = Math.max(0, (uso?.promptTokenCount ?? 0) - cacheadas);
+  const salida = (uso?.candidatesTokenCount ?? 0) + (uso?.thoughtsTokenCount ?? 0);
+
+  return {
+    etiqueta: validada.data,
+    costoUsd: esGratis("gemini") ? 0 : costoUsd({ entrada, entradaCacheada: cacheadas, salida }, "gemini"),
+    latenciaMs: Date.now() - arranque,
+    modelo,
+  };
+}
+
 export const gemini: Proveedor = {
   nombre: "gemini",
   get modelo() {
@@ -246,4 +323,5 @@ export const gemini: Proveedor = {
   },
   variableClave: "GEMINI_API_KEY",
   estimar,
+  leerEtiqueta,
 };

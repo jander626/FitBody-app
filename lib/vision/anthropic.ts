@@ -3,12 +3,16 @@ import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { costoUsd } from "@/lib/guardrails/costos";
+import { EtiquetaSchema } from "@/lib/barcode/etiqueta";
 import { RespuestaSchema } from "./esquema";
+import { INSTRUCCIONES_ETIQUETA } from "./prompt-etiqueta";
 import { contexto, instrucciones, vocabulario } from "./prompt";
 import type {
+  FotoEtiqueta,
   PeticionEstimacion,
   Proveedor,
   ResultadoEstimacion,
+  ResultadoLecturaEtiqueta,
 } from "./proveedor";
 
 /**
@@ -139,6 +143,50 @@ async function estimar(
   };
 }
 
+async function leerEtiqueta(foto: FotoEtiqueta): Promise<ResultadoLecturaEtiqueta> {
+  const anthropic = obtenerCliente();
+  const modelo = modeloActivo();
+  const arranque = Date.now();
+
+  // Sin `thinking`: leer una tabla es transcribir, y pensar de más solo suma
+  // segundos a una espera que ya se nota.
+  const respuesta = await anthropic.messages.parse({
+    model: modelo,
+    max_tokens: 1000,
+    system: INSTRUCCIONES_ETIQUETA,
+    messages: [
+      {
+        role: "user",
+        content: [
+          { type: "image", source: { type: "base64", media_type: foto.mediaType, data: foto.base64 } },
+          { type: "text", text: "Lee la tabla nutricional de esta foto." },
+        ],
+      },
+    ],
+    output_config: { format: zodOutputFormat(EtiquetaSchema), effort: "low" },
+  });
+
+  if (!respuesta.parsed_output) {
+    throw new Error("No pude leer la etiqueta con la forma esperada. Intenta con otra foto o escribe los valores.");
+  }
+
+  const uso = respuesta.usage;
+  return {
+    etiqueta: respuesta.parsed_output,
+    costoUsd: costoUsd(
+      {
+        entrada: uso.input_tokens ?? 0,
+        entradaCacheada: uso.cache_read_input_tokens ?? 0,
+        escrituraCache: uso.cache_creation_input_tokens ?? 0,
+        salida: uso.output_tokens ?? 0,
+      },
+      "anthropic",
+    ),
+    latenciaMs: Date.now() - arranque,
+    modelo,
+  };
+}
+
 export const anthropic: Proveedor = {
   nombre: "anthropic",
   get modelo() {
@@ -146,4 +194,5 @@ export const anthropic: Proveedor = {
   },
   variableClave: "ANTHROPIC_API_KEY",
   estimar,
+  leerEtiqueta,
 };

@@ -1,9 +1,9 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
-import { diasConRegistro, fechaDeHoy, obtenerDia } from "@/lib/datos/diario";
-import { haceDias, racha } from "@/lib/racha";
-import { semanaDe } from "@/lib/semana";
-import { obtenerConsejos } from "@/lib/datos/consejos";
+import { fechaDeHoy, obtenerDia } from "@/lib/datos/diario";
+import { registroReciente } from "@/lib/datos/semana";
 import { usuarioActual } from "@/lib/supabase/cliente-servidor";
+import { ConsejoDelDia } from "./consejo-del-dia";
 import { VistaHoy } from "./vista";
 
 export const metadata = { title: "Hoy — FitFood" };
@@ -18,16 +18,9 @@ export default async function Hoy(props: PageProps<"/hoy">) {
   const dia =
     typeof fecha === "string" && /^\d{4}-\d{2}-\d{2}$/.test(fecha) ? fecha : hoy;
 
-  // El consejo principal se trae solo mirando hoy: en un día pasado es ruido,
-  // porque el análisis siempre habla de la última semana.
-  const semana = semanaDe(dia);
-  // La racha mira 60 días hacia atrás desde hoy; la franja, la semana que se
-  // ve. Una sola consulta cubriría las dos, pero la semana puede ser antigua.
-  const [diario, consejos, registrados, recientes] = await Promise.all([
+  const [diario, reciente] = await Promise.all([
     obtenerDia(usuario.id, dia),
-    dia === hoy ? obtenerConsejos(usuario.id) : null,
-    diasConRegistro(usuario.id, semana),
-    diasConRegistro(usuario.id, [haceDias(hoy, 60), hoy]),
+    registroReciente(usuario.id, dia, hoy),
   ]);
 
   // Primera vez: sin objetivo ni comidas no hay nada que mostrar, y la pantalla
@@ -41,10 +34,19 @@ export default async function Hoy(props: PageProps<"/hoy">) {
       dia={diario}
       esHoy={dia === hoy}
       hoy={hoy}
-      semana={semana}
-      registrados={registrados}
-      racha={racha(recientes, hoy)}
-      consejo={consejos?.consejos[0] ?? null}
+      semana={reciente.semana}
+      registrados={reciente.registrados}
+      racha={reciente.racha}
+      // El consejo es lo más lento de calcular, así que llega después: el resto
+      // de la pantalla no lo espera. Solo mirando hoy; en un día pasado es
+      // ruido, porque el análisis siempre habla de la última semana.
+      consejo={
+        dia === hoy ? (
+          <Suspense fallback={<div className="h-32 animate-pulse rounded-3xl bg-hairline-soft" />}>
+            <ConsejoDelDia usuarioId={usuario.id} />
+          </Suspense>
+        ) : null
+      }
     />
   );
 }

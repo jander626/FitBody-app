@@ -6,6 +6,7 @@ import {
   ultimos,
   type Consejo,
 } from "@/lib/coach/consejos";
+import { haceDias } from "@/lib/racha";
 import { fechaDeHoy } from "./diario";
 import { obtenerHistorial } from "./historial";
 import { obtenerMetricas } from "./metricas";
@@ -27,10 +28,15 @@ export interface EstadoConsejos {
  * puro y está testeado.
  */
 export async function obtenerConsejos(userId: string): Promise<EstadoConsejos> {
-  const [hoy, historial, metricas] = await Promise.all([
-    fechaDeHoy(),
-    obtenerHistorial(userId),
-    obtenerMetricas(userId),
+  const hoy = await fechaDeHoy();
+  // Las reglas miran VENTANA_DIAS hacia atrás. Traer toda la historia para
+  // eso era lo más lento de abrir Hoy, y crece con cada día que se registra:
+  // se pide solo lo que se va a usar, con unos días de margen.
+  const desde = haceDias(hoy, VENTANA_DIAS + 6);
+
+  const [historial, metricas] = await Promise.all([
+    obtenerHistorial(userId, desde),
+    obtenerMetricas(userId, desde),
   ]);
 
   const consejos = generarConsejos({

@@ -87,6 +87,7 @@ export interface Database {
           creado_por: string | null;
           creado_en: string;
           actualizado_en: string;
+          codigo_barras: string | null;
         };
         Insert: {
           id?: string;
@@ -103,6 +104,7 @@ export interface Database {
           creado_por?: string | null;
           creado_en?: string;
           actualizado_en?: string;
+          codigo_barras?: string | null;
         };
         Update: {
           id?: string;
@@ -119,11 +121,44 @@ export interface Database {
           creado_por?: string | null;
           creado_en?: string;
           actualizado_en?: string;
+          codigo_barras?: string | null;
         };
         Relationships: [
           {
             foreignKeyName: "foods_creado_por_fkey";
             columns: ["creado_por"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      label_scans: {
+        Row: {
+          id: string;
+          user_id: string;
+          modelo: string | null;
+          costo_usd: number;
+          creado_en: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          modelo?: string | null;
+          costo_usd?: number;
+          creado_en?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          modelo?: string | null;
+          costo_usd?: number;
+          creado_en?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "label_scans_user_id_fkey";
+            columns: ["user_id"];
             isOneToOne: false;
             referencedRelation: "users";
             referencedColumns: ["id"];

@@ -93,3 +93,22 @@ export function repartoDeEnergia(t: Totales): { proteina: number; carbs: number;
   }
   return { proteina: pisos[0], carbs: pisos[1], grasa: pisos[2] };
 }
+
+/**
+ * Qué tan avanzada se ve la espera de una estimación, de 0 a 100.
+ *
+ * El modelo no avisa cuánto lleva, así que esto no es un progreso real: es una
+ * curva que sube rápido al principio, se va frenando y nunca llega al final por
+ * sí sola. Llega a 100 cuando la respuesta llega de verdad. Una barra que se
+ * detiene en 100 sin que haya terminado miente; una que se acerca y espera, no.
+ */
+export function porcentajeDeEspera(ms: number): number {
+  if (ms <= 0) return 0;
+  return Math.min(92, Math.round(92 * (1 - Math.exp(-ms / 5000))));
+}
+
+/** En cuál de las `etapas` va la espera: avanza cada ~2,2 s y se queda en la última. */
+export function etapaDeEspera(ms: number, etapas: number): number {
+  if (etapas <= 0) return 0;
+  return Math.min(etapas - 1, Math.max(0, Math.floor(ms / 2200)));
+}

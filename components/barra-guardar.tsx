@@ -24,6 +24,8 @@ export function BarraGuardar({
   deshabilitado,
   onGuardar,
   onDescartar,
+  verbo = "Guardar",
+  etiquetaDescartar = "Descartar y empezar de nuevo",
 }: {
   /** Solo la muestra el modo que está a la vista: los demás siguen montados. */
   activa: boolean;
@@ -34,6 +36,9 @@ export function BarraGuardar({
   deshabilitado: boolean;
   onGuardar: () => void;
   onDescartar?: () => void;
+  /** "Guardar" al registrar, "Guardar cambios" al corregir. */
+  verbo?: string;
+  etiquetaDescartar?: string;
 }) {
   const hidratado = useHidratado();
   if (!activa) return null;
@@ -72,7 +77,7 @@ export function BarraGuardar({
                   <button
                     type="button"
                     onClick={onDescartar}
-                    aria-label="Descartar y empezar de nuevo"
+                    aria-label={etiquetaDescartar}
                     className="flex size-14 shrink-0 items-center justify-center rounded-full bg-hairline-soft text-ink-2"
                   >
                     <svg viewBox="0 0 24 24" className="size-5" fill="none" aria-hidden="true">
@@ -86,7 +91,7 @@ export function BarraGuardar({
                   disabled={guardando || deshabilitado}
                   className="flex-1 rounded-full bg-accent px-5 py-4 text-base font-semibold text-sobre-accent disabled:opacity-50"
                 >
-                  {guardando ? "Guardando…" : `Guardar · ${Math.round(kcal)} kcal`}
+                  {guardando ? "Guardando…" : `${verbo} · ${Math.round(kcal)} kcal`}
                 </button>
               </div>
             </div>

@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { Aviso, TituloSeccion } from "@/components/ui";
-import { FotoAmpliable } from "@/components/foto-ampliable";
 import { TarjetaConsejo } from "@/components/tarjeta-consejo";
 import { FranjaSemana } from "@/components/franja-semana";
 import { MedidorDia } from "@/components/medidor-dia";
 import type { ComidaDiario, Dia } from "@/lib/datos/diario";
 import type { Consejo } from "@/lib/coach/consejos";
+import { emojiDeAlimento, tituloDeComida } from "@/lib/registro/presentacion";
 
 const NOMBRE_MOMENTO: Record<string, string> = {
   desayuno: "Desayuno",
@@ -251,44 +251,80 @@ function SeccionComida({
 
 function ComidaRegistrada({ comida }: { comida: ComidaDiario }) {
   return (
-    <div>
-      <div className="flex items-start gap-3">
+    // Toda la comida es el botón de corregir: tocar lo que ves para cambiarlo
+    // es lo primero que se intenta, y un enlace chico de "Corregir" al fondo
+    // obligaba a buscarlo.
+    <Link
+      href={`/comida/${comida.id}`}
+      aria-label={`Corregir ${NOMBRE_MOMENTO[comida.momento] ?? comida.momento}: ${Math.round(comida.subtotal.kcal)} kcal`}
+      className="block rounded-2xl"
+    >
+      <div className="flex items-center gap-3">
         {comida.fotoUrl && (
-          // Chica y cuadrada: acá alcanza para reconocer el plato. Tocarla la
-          // abre a pantalla completa, que es cuando de verdad se necesita
-          // mirarla — para juzgar si la porción estimada era la que había.
-          <FotoAmpliable
+          // Una miniatura sin zoom: dentro de un enlace no puede haber otro
+          // botón. La foto grande, con zoom, está en la pantalla de corregir.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
             src={comida.fotoUrl}
             alt=""
-            etiqueta={`Ver en grande la foto del ${(NOMBRE_MOMENTO[comida.momento] ?? comida.momento).toLowerCase()}`}
             loading="lazy"
-            className="size-12 shrink-0 rounded-lg object-cover"
+            className="size-14 shrink-0 rounded-xl object-cover"
           />
         )}
 
-        <div className="flex flex-1 items-baseline justify-between gap-3">
-          <h3 className="text-xs text-muted">
-            {comida.hora ? comida.hora.slice(0, 5) : "Registrada"}
-          </h3>
-          <span className="font-mono text-sm text-ink tabular-nums">
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium text-ink">
+            {tituloDeComida(comida.items)}
+          </p>
+          <p className="text-xs text-muted">
+            {comida.hora ? `${comida.hora.slice(0, 5)} · ` : ""}
+            {NOMBRE_ORIGEN[comida.origen] ?? comida.origen}
+            {comida.corregido ? " · corregida" : ""}
+            {comida.confianza === "baja" && (
+              <span className="text-warn"> · confianza baja</span>
+            )}
+          </p>
+        </div>
+
+        <div className="shrink-0 text-right">
+          <p className="font-mono text-sm text-ink tabular-nums">
             {Math.round(comida.subtotal.kcal)}
             <span className="text-muted"> kcal</span>
-          </span>
+          </p>
+          <p className="font-mono text-[11px] text-muted tabular-nums">
+            {Math.round(comida.subtotal.proteinaG)}P{" "}
+            {Math.round(comida.subtotal.carbsG)}C{" "}
+            {Math.round(comida.subtotal.grasaG)}G
+          </p>
         </div>
+
+        <svg
+          viewBox="0 0 24 24"
+          className="size-4 shrink-0 text-muted"
+          fill="none"
+          aria-hidden="true"
+        >
+          <path
+            d="M9 5l7 7-7 7"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
       </div>
 
-      <ul className="mt-2.5 space-y-1.5">
+      <ul className="mt-2.5 space-y-1 pl-1">
         {comida.items.map((item) => {
           const porcion = formatearPorcion(item);
           return (
             <li key={item.id} className="flex items-start justify-between gap-3">
-              <span className="text-sm text-ink-2">
+              <span className="text-xs text-ink-2">
+                <span aria-hidden="true">{emojiDeAlimento(item.alimento)} </span>
                 {item.alimento}
-                {porcion && (
-                  <span className="ml-1.5 text-xs text-muted">{porcion}</span>
-                )}
+                {porcion && <span className="ml-1.5 text-muted">{porcion}</span>}
               </span>
-              <span className="shrink-0 font-mono text-xs text-muted tabular-nums">
+              <span className="shrink-0 font-mono text-[11px] text-muted tabular-nums">
                 {Math.round(item.kcal)}
               </span>
             </li>
@@ -296,39 +332,9 @@ function ComidaRegistrada({ comida }: { comida: ComidaDiario }) {
         })}
       </ul>
 
-      <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-hairline-soft pt-2 text-xs text-muted">
-        <span className="font-mono tabular-nums">
-          {Math.round(comida.subtotal.proteinaG)}P ·{" "}
-          {Math.round(comida.subtotal.carbsG)}C ·{" "}
-          {Math.round(comida.subtotal.grasaG)}G
-        </span>
-        <span>{NOMBRE_ORIGEN[comida.origen] ?? comida.origen}</span>
-        {comida.confianza && (
-          <span
-            className={
-              comida.confianza === "baja" ? "text-warn" : undefined
-            }
-          >
-            confianza {comida.confianza}
-          </span>
-        )}
-        {comida.corregido && <span>corregida</span>}
-
-        {/*
-          Al final y discreto: corregir es frecuente, pero mirar el diario lo
-          es más. Que se vea sin competirle a los números.
-        */}
-        <Link
-          href={`/comida/${comida.id}`}
-          className="ml-auto text-accent underline-offset-4 hover:underline"
-        >
-          Corregir
-        </Link>
-      </div>
-
       {comida.nota && (
         <p className="mt-2 text-xs leading-relaxed text-muted">{comida.nota}</p>
       )}
-    </div>
+    </Link>
   );
 }

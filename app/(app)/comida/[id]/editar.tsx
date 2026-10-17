@@ -3,33 +3,39 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Aviso, Encabezado, Tarjeta, TituloSeccion, claseControl } from "@/components/ui";
-import { FotoAmpliable } from "@/components/foto-ampliable";
+import { Aviso } from "@/components/ui";
+import { BarraGuardar } from "@/components/barra-guardar";
 import { EditorItems, type ItemEditable } from "@/components/editor-items";
-import {
-  buscarAlimentos,
-  macrosDePorcion,
-  porcionSugerida,
-  type Alimento,
-} from "@/lib/alimentos";
+import { FotoAmpliable } from "@/components/foto-ampliable";
+import { ResumenComida } from "@/components/resumen-comida";
+import type { Alimento } from "@/lib/alimentos";
 import {
   MOMENTOS,
-  NOMBRE_MOMENTO,
   totalesDeItems,
   type ItemBorrador,
 } from "@/lib/registro/tipos";
 import type { ComidaSuelta } from "@/lib/datos/diario";
 import { actualizarComida, borrarComida } from "../../registrar/acciones";
 
+const ETIQUETA_ORIGEN: Record<string, string> = {
+  foto: "Registrada con foto",
+  descripcion: "Registrada con texto",
+  "foto+descripcion": "Registrada con foto y texto",
+  manual: "Registrada a mano",
+};
+
 /**
  * Corregir una comida ya guardada.
  *
- * Es la misma tarjeta editable del registro: corregir después no es un modo
- * aparte, es lo mismo que corregir antes de guardar. Lo único que cambia es de
- * dónde vienen los ítems y a dónde van.
+ * Es la misma pantalla del registro: corregir después no es un modo aparte, es
+ * lo mismo que corregir antes de guardar. Se llega tocando la comida en Hoy.
+ * Arriba la foto grande —acá es donde de verdad sirve: mirando el plato se
+ * juzga si 200 g de pollo eran 200 g—, el resumen que se mueve mientras se
+ * ajusta, los ingredientes con su deslizador y "Agregar ingrediente". Abajo, la
+ * barra fija con la comida a la que pertenece y el botón de guardar.
  *
- * El borrado pide confirmación en dos toques. Es la única acción de la app que
- * destruye datos y no se puede deshacer.
+ * Borrar es la única acción de la app que destruye datos y no se puede
+ * deshacer, así que va separada de guardar y pide confirmación.
  */
 export function EditarComida({
   comida,
@@ -56,37 +62,16 @@ export function EditarComida({
   );
   const [momento, setMomento] = useState(comida.momento);
   const [fecha, setFecha] = useState(comida.fecha);
-  const [consulta, setConsulta] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [confirmandoBorrado, setConfirmandoBorrado] = useState(false);
   const [trabajando, iniciar] = useTransition();
 
   const totales = totalesDeItems(items);
-  const resultados = consulta.trim()
-    ? buscarAlimentos(alimentos, consulta, 8)
-    : [];
 
   // Al día donde quedó la comida, no al que estaba: si se movió de fecha,
   // volver al viejo mostraría una pantalla sin ella y parecería que se perdió.
   const volver = (destino: string = fecha) =>
     router.push(`/hoy?fecha=${destino}` as never);
-
-  function agregar(alimento: Alimento) {
-    const gramos = porcionSugerida(alimento);
-    setItems((previos) => [
-      ...previos,
-      {
-        clave: `${alimento.id}-${Date.now()}`,
-        foodId: alimento.id,
-        alimento: alimento.nombre,
-        porcionG: gramos,
-        porcionMl: null,
-        nota: null,
-        ...macrosDePorcion(alimento, gramos),
-      },
-    ]);
-    setConsulta("");
-  }
 
   function guardar() {
     setError(null);
@@ -115,6 +100,7 @@ export function EditarComida({
       const r = await borrarComida(comida.id);
       if (!r.ok) {
         setError(r.error);
+        setConfirmandoBorrado(false);
         return;
       }
       // Al día original: la comida ya no existe, y llevar al día que se estaba
@@ -125,179 +111,119 @@ export function EditarComida({
 
   return (
     <>
-      <Encabezado
-        titulo="Corregir"
-        bajada={`${NOMBRE_MOMENTO[momento as keyof typeof NOMBRE_MOMENTO] ?? momento} del ${comida.fecha.slice(5)}`}
-      />
+      <header className="flex items-center gap-3 px-5 pt-5 pb-3">
+        <Link
+          href={`/hoy?fecha=${comida.fecha}`}
+          aria-label="Cerrar sin guardar"
+          className="flex size-11 shrink-0 items-center justify-center rounded-full border border-hairline bg-surface text-ink"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            className="size-5"
+            fill="none"
+            aria-hidden="true"
+          >
+            <path
+              d="M6 6l12 12M18 6L6 18"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+            />
+          </svg>
+        </Link>
+        <h1 className="flex-1 pr-11 text-center font-serif text-xl text-ink">
+          Corregir comida
+        </h1>
+      </header>
 
-      <div className="space-y-6 px-5">
+      <div className="space-y-5 px-5">
         {comida.fotoUrl && (
-          <div>
-            <TituloSeccion>La foto</TituloSeccion>
-            {/*
-              Grande y arriba de todo: acá es donde de verdad sirve. Mirando el
-              plato se juzga si 200 g de pollo eran 200 g, que es la corrección
-              que más se hace y la que más mueve el número.
-            */}
+          <div className="entra overflow-hidden rounded-[2rem] border border-hairline">
             <FotoAmpliable
               src={comida.fotoUrl}
               alt="La foto con la que se registró esta comida"
               etiqueta="Ver la foto a pantalla completa"
-              className="w-full rounded-2xl border border-hairline object-cover"
+              className="aspect-[4/3] w-full object-cover"
             />
           </div>
         )}
 
-        <div>
-          <TituloSeccion>Lo que comiste</TituloSeccion>
-          <Tarjeta>
-            {items.length === 0 ? (
-              <p className="text-sm text-muted">
-                No queda ningún alimento. Agregá al menos uno, o borrá la
-                comida entera.
-              </p>
-            ) : (
-              <EditorItems
-                items={items}
-                alimentos={alimentos}
-                onCambiar={setItems}
-              />
-            )}
+        <ResumenComida
+          items={items}
+          totales={totales}
+          etiqueta={ETIQUETA_ORIGEN[comida.origen]}
+        />
 
-            <div className="mt-3 flex items-baseline justify-between border-t border-hairline-soft pt-3">
-              <span className="text-sm text-ink-2">Total</span>
-              <span className="font-mono text-sm tabular-nums text-ink">
-                {Math.round(totales.kcal)} kcal
-                <span className="text-muted">
-                  {" · "}
-                  {Math.round(totales.proteinaG)}P {Math.round(totales.carbsG)}C{" "}
-                  {Math.round(totales.grasaG)}G
-                </span>
-              </span>
-            </div>
-
-            <label className="mt-3 block">
-              <span className="text-sm font-medium text-ink-2">Día</span>
-              <input
-                type="date"
-                value={fecha}
-                onChange={(e) => setFecha(e.target.value || comida.fecha)}
-                className={claseControl}
-              />
-            </label>
-
-            <label className="mt-3 block">
-              <span className="text-sm font-medium text-ink-2">Momento</span>
-              <select
-                value={momento}
-                onChange={(e) => setMomento(e.target.value)}
-                className={claseControl}
-              >
-                {MOMENTOS.map((m) => (
-                  <option key={m} value={m}>
-                    {NOMBRE_MOMENTO[m]}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <button
-              type="button"
-              onClick={guardar}
-              disabled={trabajando || items.length === 0}
-              className="mt-3 w-full rounded-xl bg-accent px-4 py-3 text-base font-medium text-sobre-accent disabled:opacity-50"
-            >
-              {trabajando ? "Guardando…" : "Guardar los cambios"}
-            </button>
-
-            <Link
-              href={`/hoy?fecha=${comida.fecha}`}
-              className="mt-2 block py-2 text-center text-sm text-muted"
-            >
-              Cancelar
-            </Link>
-
-            {error && (
-              <div className="mt-3">
-                <Aviso nivel="error">{error}</Aviso>
-              </div>
-            )}
-          </Tarjeta>
+        <div className="rounded-3xl border border-hairline bg-surface p-4 shadow-[var(--shadow)]">
+          {items.length === 0 && (
+            <p className="mb-3 text-sm text-muted">
+              No queda ningún alimento. Agrega al menos uno, o borra la comida
+              entera.
+            </p>
+          )}
+          <EditorItems items={items} alimentos={alimentos} onCambiar={setItems} />
         </div>
 
-        <div>
-          <TituloSeccion>Agregar algo que falta</TituloSeccion>
+        <label className="flex items-center justify-between gap-3 rounded-2xl border border-hairline bg-surface px-4 py-3">
+          <span className="text-sm font-medium text-ink-2">Día</span>
           <input
-            type="search"
-            value={consulta}
-            onChange={(e) => setConsulta(e.target.value)}
-            placeholder="arepa, pollo, chicharrón…"
-            aria-label="Buscar un alimento para agregar"
-            className={`${claseControl} mt-0`}
+            type="date"
+            value={fecha}
+            onChange={(e) => setFecha(e.target.value || comida.fecha)}
+            className="bg-transparent text-right text-sm text-ink outline-none"
           />
-          {resultados.length > 0 && (
-            <ul className="mt-3 space-y-2">
-              {resultados.map((alimento) => (
-                <li key={alimento.id}>
-                  <button
-                    type="button"
-                    onClick={() => agregar(alimento)}
-                    className="flex w-full items-center justify-between gap-3 rounded-xl border border-hairline bg-surface px-3.5 py-3 text-left"
-                  >
-                    <span className="min-w-0">
-                      <span className="block truncate text-sm text-ink">
-                        {alimento.nombre}
-                      </span>
-                      <span className="block text-xs text-muted">
-                        {alimento.kcal100} kcal · {alimento.p100}P por 100 g
-                      </span>
-                    </span>
-                    <span className="shrink-0 text-xs text-accent">Agregar</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+        </label>
 
-        <div className="pb-4">
-          <TituloSeccion>Borrar</TituloSeccion>
-          {confirmandoBorrado ? (
-            <Tarjeta>
-              <p className="text-sm text-ink-2">
-                Se borra la comida entera con sus {comida.items.length}{" "}
-                {comida.items.length === 1 ? "alimento" : "alimentos"}. No se
-                puede deshacer.
-              </p>
-              <div className="mt-3 flex gap-2">
-                <button
-                  type="button"
-                  onClick={borrar}
-                  disabled={trabajando}
-                  className="flex-1 rounded-xl bg-bad px-4 py-3 text-base font-medium text-white disabled:opacity-50"
-                >
-                  {trabajando ? "Borrando…" : "Sí, borrar"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setConfirmandoBorrado(false)}
-                  className="flex-1 rounded-xl border border-hairline px-4 py-3 text-base text-ink"
-                >
-                  No
-                </button>
-              </div>
-            </Tarjeta>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setConfirmandoBorrado(true)}
-              className="w-full rounded-xl border border-hairline px-4 py-3 text-sm text-bad"
-            >
-              Borrar esta comida
-            </button>
-          )}
-        </div>
+        {error && <Aviso nivel="error">{error}</Aviso>}
       </div>
+
+      {confirmandoBorrado && (
+        <div
+          className="pop fixed inset-0 z-30 flex items-end bg-black/50 px-3"
+          style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
+          role="alertdialog"
+          aria-label="Borrar esta comida"
+        >
+          <div className="mx-auto w-full max-w-md rounded-[2rem] bg-surface p-5">
+            <h2 className="font-serif text-xl text-ink">¿Borrar esta comida?</h2>
+            <p className="mt-2 text-sm text-ink-2">
+              Se borra la comida entera con sus {comida.items.length}{" "}
+              {comida.items.length === 1 ? "alimento" : "alimentos"}. No se puede
+              deshacer.
+            </p>
+            <div className="mt-4 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmandoBorrado(false)}
+                className="flex-1 rounded-full bg-hairline-soft px-4 py-3.5 text-base font-medium text-ink"
+              >
+                No
+              </button>
+              <button
+                type="button"
+                onClick={borrar}
+                disabled={trabajando}
+                className="flex-1 rounded-full bg-bad px-4 py-3.5 text-base font-semibold text-white disabled:opacity-50"
+              >
+                {trabajando ? "Borrando…" : "Sí, borrar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <BarraGuardar
+        activa
+        momento={momento as (typeof MOMENTOS)[number]}
+        onMomento={setMomento}
+        kcal={totales.kcal}
+        guardando={trabajando}
+        deshabilitado={items.length === 0}
+        onGuardar={guardar}
+        onDescartar={() => setConfirmandoBorrado(true)}
+        verbo="Guardar cambios"
+        etiquetaDescartar="Borrar esta comida"
+      />
     </>
   );
 }

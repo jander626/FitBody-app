@@ -39,7 +39,8 @@ export function NavegacionInferior() {
 
   // Registrar es una pantalla de captura con su propia barra de modos: la
   // general se esconde para no apilar dos barras una sobre otra.
-  if (registrando) return null;
+  // Lo mismo al corregir una comida: ahí manda la barra de guardar.
+  if (registrando || estaEn("/comida")) return null;
 
   return (
     <nav

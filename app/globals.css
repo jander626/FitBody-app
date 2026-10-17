@@ -552,3 +552,17 @@ input[type="range"].rango:focus-visible::-moz-range-thumb {
     opacity: 0;
   }
 }
+
+/* La barrida de luz sobre la foto mientras se estima. */
+@keyframes barrido {
+  from {
+    top: -35%;
+  }
+  to {
+    top: 100%;
+  }
+}
+.barrido {
+  background: linear-gradient(to bottom, transparent, rgba(255, 255, 255, 0.55), transparent);
+  animation: barrido 1.8s ease-in-out infinite;
+}

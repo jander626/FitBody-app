@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { emojiDeAlimento, repartoDeEnergia, tituloDeComida } from "@/lib/registro/presentacion";
+import {
+  emojiDeAlimento,
+  etapaDeEspera,
+  porcentajeDeEspera,
+  repartoDeEnergia,
+  tituloDeComida,
+} from "@/lib/registro/presentacion";
 
 describe("emojiDeAlimento", () => {
   it("reconoce alimentos comunes, con tildes y mayúsculas", () => {
@@ -61,5 +67,33 @@ describe("repartoDeEnergia", () => {
 
   it("sin macros no hay reparto", () => {
     expect(repartoDeEnergia({ kcal: 0, proteinaG: 0, carbsG: 0, grasaG: 0 })).toEqual({ proteina: 0, carbs: 0, grasa: 0 });
+  });
+});
+
+describe("espera de una estimación", () => {
+  it("el porcentaje sube sin retroceder y nunca llega solo al 100", () => {
+    let previo = -1;
+    for (const ms of [0, 500, 1000, 2000, 5000, 10000, 30000, 600000]) {
+      const p = porcentajeDeEspera(ms);
+      expect(p).toBeGreaterThanOrEqual(previo);
+      expect(p).toBeLessThan(100);
+      previo = p;
+    }
+    expect(porcentajeDeEspera(0)).toBe(0);
+    expect(porcentajeDeEspera(-5)).toBe(0);
+  });
+
+  it("avanza rápido al principio y se frena", () => {
+    const primeros = porcentajeDeEspera(2000) - porcentajeDeEspera(0);
+    const siguientes = porcentajeDeEspera(12000) - porcentajeDeEspera(10000);
+    expect(primeros).toBeGreaterThan(siguientes * 3);
+  });
+
+  it("la etapa cambia cada ~2,2 s y se queda en la última", () => {
+    expect(etapaDeEspera(0, 3)).toBe(0);
+    expect(etapaDeEspera(2300, 3)).toBe(1);
+    expect(etapaDeEspera(4500, 3)).toBe(2);
+    expect(etapaDeEspera(99999, 3)).toBe(2);
+    expect(etapaDeEspera(5000, 0)).toBe(0);
   });
 });

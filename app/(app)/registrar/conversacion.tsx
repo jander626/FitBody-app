@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Aviso, Tarjeta, TituloSeccion, claseControl } from "@/components/ui";
 import { BarraGuardar } from "@/components/barra-guardar";
+import { ProgresoEstimacion } from "@/components/progreso-estimacion";
 import { EditorItems, type ItemEditable } from "@/components/editor-items";
 import { ResumenComida } from "@/components/resumen-comida";
 import { TuDia } from "@/components/tu-dia";
@@ -336,6 +337,21 @@ function Formulario({
 
   // ---------------------------------------------------------- entrada ---
 
+  // La primera estimación (la de la foto o el texto) toma toda la pantalla: es
+  // la espera larga, y un botón que cambia de texto se siente colgado.
+  if (!estimacion && pensando) {
+    return (
+      <ProgresoEstimacion
+        fotoBase64={foto?.base64 ?? null}
+        etapas={
+          foto
+            ? ["Mirando tu foto", "Identificando los alimentos", "Calculando porciones y macros"]
+            : ["Leyendo tu descripción", "Buscando los alimentos", "Calculando porciones y macros"]
+        }
+      />
+    );
+  }
+
   if (!estimacion) {
     return (
       <div className="space-y-4">
@@ -416,7 +432,7 @@ function Formulario({
           disabled={pensando || (!foto && texto.trim().length === 0)}
           className="w-full rounded-xl bg-accent px-4 py-3 text-base font-medium text-sobre-accent disabled:opacity-50"
         >
-          {pensando ? "Estimando…" : "Estimar"}
+          Estimar
         </button>
 
         {fueraDeTema && <Aviso nivel="info">{fueraDeTema}</Aviso>}
@@ -504,6 +520,12 @@ function Formulario({
             >
               {pensando ? "Ajustando…" : "Ajustar estimación"}
             </button>
+            {pensando && (
+              <ProgresoEstimacion
+                compacto
+                etapas={["Leyendo tu corrección", "Recalculando porciones", "Ajustando los macros"]}
+              />
+            )}
             <p className="mt-2 text-xs text-muted">
               Quedan {estimacion.turnosRestantes}{" "}
               {estimacion.turnosRestantes === 1 ? "ajuste" : "ajustes"}. Después

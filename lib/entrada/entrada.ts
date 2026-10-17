@@ -11,7 +11,7 @@
  * propia sesión, así que se tratan como entrada no confiable.
  */
 import { z } from "zod";
-import { calcularPlan, type Plan } from "@/lib/nutrition";
+import { calcularPlan, tdee, tmb, type Plan } from "@/lib/nutrition";
 import {
   METAS,
   parametrosDe,
@@ -39,8 +39,16 @@ export const EntradaSchema = z.object({
   pesoMetaKg: z.number().min(20).max(400).optional(),
   /** Sin esto se asume la recomendada: lo anterior a esta pregunta. */
   dieta: z.enum(["recomendada", "alta_proteina", "baja_carbs", "keto", "baja_grasa"]).optional(),
-  /** ¿Entrena fuerza? Sin respuesta se asume que sí, como antes de la pregunta. */
-  fuerza: z.boolean().optional(),
+  /**
+   * Cuántas veces a la semana entrena fuerza. Acepta también el sí/no de antes:
+   * una respuesta vieja no puede romper la lectura.
+   */
+  fuerza: z.union([z.boolean(), z.enum(["ninguna", "1-2", "3-4", "5+"])]).optional(),
+  /**
+   * Lo que gasta al día según su reloj (promedio de calorías totales). Si está,
+   * sustituye a la estimación por fórmula, que tiene un margen de ±10 %.
+   */
+  gastoMedidoKcal: z.number().min(1200).max(5000).optional(),
 });
 
 export type Entrada = z.infer<typeof EntradaSchema>;
@@ -56,6 +64,8 @@ export interface PlanDeEntrada {
   calculo: Plan;
   /** Hasta dónde se puede mover el día sin salirse del plan. */
   rango: { min: number; max: number };
+  /** Si el gasto salió del reloj y no de la fórmula. */
+  gastoUsado: boolean;
 }
 
 /** El rango en que un día "cuenta como bueno", redondeado a 10 kcal. */
@@ -68,34 +78,65 @@ export function rangoDeCalorias(kcal: number): { min: number; max: number } {
 }
 
 export function planDeEntrada(entrada: Entrada): PlanDeEntrada {
-  const parametros = parametrosDe({
+  const base = parametrosDe({
     meta: entrada.meta,
     actividad: entrada.actividad,
     ...(entrada.ritmo ? { ritmo: entrada.ritmo } : {}),
   });
 
+  const persona = {
+    sexo: entrada.sexo,
+    edad: entrada.edad,
+    estaturaCm: entrada.estaturaCm,
+    pesoKg: entrada.pesoKg,
+  };
+
+  // Con el gasto de un reloj, el factor de actividad deja de ser una pregunta:
+  // se despeja de la medida. Así todo lo que viene después (el perfil, el
+  // ajuste semanal) reproduce el mismo gasto con la fórmula de siempre, sin
+  // otro camino de cálculo. Si la medida da un factor imposible (menos que
+  // estar quieto o más que un atleta), se ignora y se usa la fórmula.
+  let parametros = base;
+  let gastoUsado = false;
+  const tmbKcal = tmb(persona);
+  if (entrada.gastoMedidoKcal !== undefined) {
+    const factor = Math.round((entrada.gastoMedidoKcal / tmbKcal) * 100) / 100;
+    if (factor >= 1.0 && factor <= 2.5) {
+      parametros = { ...base, factorActividad: factor };
+      gastoUsado = true;
+    }
+  }
+
   // Primero la fuerza (cuánta proteína hace falta), después la dieta (de dónde
   // salen el resto de las calorías).
-  const base = {
+  const diales = {
     ...parametros.opciones,
     proteinaGPorKg: proteinaSegunFuerza(parametros.opciones.proteinaGPorKg, entrada.fuerza),
   };
-  const opciones = DIETAS[entrada.dieta ?? "recomendada"].opciones(base);
+  const opciones = DIETAS[entrada.dieta ?? "recomendada"].opciones(diales);
 
   const calculo = calcularPlan(
-    {
-      sexo: entrada.sexo,
-      edad: entrada.edad,
-      estaturaCm: entrada.estaturaCm,
-      pesoKg: entrada.pesoKg,
-    },
+    persona,
     parametros.factorActividad,
     parametros.objetivo,
     parametros.deficitPct,
     opciones,
   );
 
-  return { parametros, calculo, rango: rangoDeCalorias(calculo.kcalObjetivo) };
+  if (gastoUsado) {
+    const formula = tdee(tmbKcal, base.factorActividad);
+    calculo.avisos = [
+      {
+        nivel: "info",
+        mensaje:
+          `Usamos el gasto que midió tu reloj (${calculo.tdeeKcal.toLocaleString("es-CO")} kcal al día) ` +
+          `en lugar de la estimación por fórmula (${formula.toLocaleString("es-CO")} kcal).`,
+      },
+      ...calculo.avisos,
+    ];
+  }
+
+  return { parametros, calculo, rango: rangoDeCalorias(calculo.kcalObjetivo), gastoUsado };
 }
 
 /** Si la meta de peso va en la dirección que pide el objetivo. */

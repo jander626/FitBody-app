@@ -148,3 +148,84 @@ describe("dieta y fuerza", () => {
     expect(entradaDeMetadata({ ...BASE, fuerza: "si" })).toBeNull();
   });
 });
+
+describe("fuerza por días", () => {
+  const prot = (fuerza: Entrada["fuerza"]) => planDeEntrada({ ...BASE, fuerza }).calculo.proteinaG;
+
+  it("la proteína baja con menos fuerza y no sube por entrenar más", () => {
+    expect(prot("ninguna")).toBeLessThan(prot("1-2"));
+    expect(prot("1-2")).toBeLessThan(prot("3-4"));
+    expect(prot("5+")).toBe(prot("3-4"));
+  });
+
+  it("1-2 veces resta 0,2 g/kg: con 80 kg, de 160 a 145 g (redondeo a 5)", () => {
+    expect(prot("3-4")).toBe(160);
+    expect(prot("1-2")).toBe(145);
+  });
+
+  it("el sí/no de antes sigue entendiéndose", () => {
+    expect(prot(true)).toBe(prot("3-4"));
+    expect(prot(false)).toBe(prot("ninguna"));
+    expect(prot(undefined)).toBe(prot("3-4"));
+  });
+
+  it("no cambia las calorías, solo el reparto", () => {
+    const a = planDeEntrada({ ...BASE, fuerza: "ninguna" }).calculo;
+    const b = planDeEntrada({ ...BASE, fuerza: "5+" }).calculo;
+    expect(a.kcalObjetivo).toBe(b.kcalObjetivo);
+    expect(a.carbsG).toBeGreaterThan(b.carbsG);
+  });
+
+  it("el esquema acepta los niveles y rechaza otros", () => {
+    expect(entradaDeMetadata({ ...BASE, fuerza: "1-2" })).not.toBeNull();
+    expect(entradaDeMetadata({ ...BASE, fuerza: "mucho" })).toBeNull();
+  });
+});
+
+describe("gasto medido por el reloj", () => {
+  // 37 años, 170 cm, 80 kg, hombre, "poco" (1,375): fórmula ≈ 2310 kcal.
+  const sinReloj = () => planDeEntrada({ ...BASE, actividad: "moderado", ritmo: "normal" });
+  const conReloj = (g: number) =>
+    planDeEntrada({ ...BASE, actividad: "moderado", ritmo: "normal", gastoMedidoKcal: g });
+
+  it("sustituye a la fórmula: el gasto del plan es el del reloj, con margen de redondeo", () => {
+    const r = conReloj(2364);
+    expect(r.gastoUsado).toBe(true);
+    expect(Math.abs(r.calculo.tdeeKcal - 2364)).toBeLessThanOrEqual(20);
+  });
+
+  it("un gasto menor que la fórmula baja el objetivo", () => {
+    expect(sinReloj().calculo.kcalObjetivo).toBe(2100);
+    // 20 % bajo 2364 ≈ 1890 → 1900
+    expect(conReloj(2364).calculo.kcalObjetivo).toBe(1900);
+  });
+
+  it("avisa de que se usó el reloj y no la fórmula", () => {
+    const avisos = conReloj(2364).calculo.avisos.map((a) => a.mensaje).join(" ");
+    expect(avisos).toMatch(/reloj/);
+    expect(avisos).toMatch(/fórmula/);
+  });
+
+  it("un gasto imposible se ignora y se usa la fórmula", () => {
+    // Menos que el metabolismo basal (~1680) no es un gasto posible.
+    const r = conReloj(1300);
+    expect(r.gastoUsado).toBe(false);
+    expect(r.calculo.kcalObjetivo).toBe(sinReloj().calculo.kcalObjetivo);
+    // Y un factor por encima de 2,5 tampoco.
+    expect(conReloj(4900).gastoUsado).toBe(false);
+  });
+
+  it("el factor guardado reproduce el mismo gasto con la fórmula de siempre", () => {
+    const r = conReloj(2364);
+    const f = r.parametros.factorActividad;
+    expect(f).toBeGreaterThanOrEqual(1.0);
+    expect(f).toBeLessThanOrEqual(2.5);
+    expect(Math.abs(r.calculo.tmbKcal * f - 2364)).toBeLessThan(10);
+  });
+
+  it("el esquema pone límites razonables", () => {
+    expect(entradaDeMetadata({ ...BASE, gastoMedidoKcal: 2364 })).not.toBeNull();
+    expect(entradaDeMetadata({ ...BASE, gastoMedidoKcal: 300 })).toBeNull();
+    expect(entradaDeMetadata({ ...BASE, gastoMedidoKcal: 9000 })).toBeNull();
+  });
+});

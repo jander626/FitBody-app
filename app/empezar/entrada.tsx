@@ -8,7 +8,7 @@ import { MedidorSemicirculo } from "@/components/medidor-semicirculo";
 import { Confeti, useCuenta } from "@/components/movimiento";
 import { ProyeccionPeso } from "@/components/proyeccion-peso";
 import { SelectorNumero } from "@/components/selector-numero";
-import { DIETAS, ORDEN_DIETAS, type Dieta } from "@/lib/entrada/dietas";
+import { DIETAS, ORDEN_DIETAS, ORDEN_FUERZA, type Dieta, type NivelFuerza } from "@/lib/entrada/dietas";
 import { clienteNavegador } from "@/lib/supabase/cliente-navegador";
 import { rehacerPlan } from "./acciones";
 import {
@@ -60,6 +60,7 @@ type Paso =
   | "estatura"
   | "peso"
   | "pesoMeta"
+  | "reloj"
   | "salud"
   | "dieta"
   | "fuerza"
@@ -78,6 +79,7 @@ const PREGUNTAS: Paso[] = [
   "estatura",
   "peso",
   "pesoMeta",
+  "reloj",
   "salud",
   "dieta",
   "fuerza",
@@ -98,6 +100,14 @@ const EMOJI_ACTIVIDAD: Record<NivelActividad, string> = {
   moderado: "🏃",
   alto: "🏋️",
   muy_alto: "⚡",
+};
+
+const EMOJI_FUERZA: Record<NivelFuerza, string> = { ninguna: "🚶", "1-2": "💪", "3-4": "🏋️", "5+": "🔥" };
+const NOMBRE_FUERZA: Record<NivelFuerza, string> = {
+  ninguna: "No hago fuerza",
+  "1-2": "1 o 2 veces",
+  "3-4": "3 o 4 veces",
+  "5+": "5 o más veces",
 };
 
 const EMOJI_RITMO: Record<Ritmo, string> = { suave: "🐢", normal: "🚶", rapido: "🐇" };
@@ -124,8 +134,12 @@ interface Borrador {
   pesoMeta: number | null;
   condicion: boolean | null;
   dieta: Dieta;
-  /** ¿Entrena fuerza? Null = aún no contestó. */
-  fuerza: boolean | null;
+  /** Cuántas veces a la semana entrena fuerza. Null = aún no contestó. */
+  fuerza: NivelFuerza | null;
+  /** ¿Tiene un reloj que mide cuánto gasta? Null = aún no contestó. */
+  reloj: boolean | null;
+  /** Su gasto diario medido, si dijo que sí. */
+  gasto: number | null;
 }
 
 const VACIO: Borrador = {
@@ -140,6 +154,8 @@ const VACIO: Borrador = {
   condicion: null,
   dieta: "recomendada",
   fuerza: null,
+  reloj: null,
+  gasto: null,
 };
 
 function leerBorrador(): Borrador {
@@ -149,6 +165,27 @@ function leerBorrador(): Borrador {
   } catch {
     return VACIO;
   }
+}
+
+/** Las respuestas como las entiende el motor; null mientras falte algo. */
+function armarEntrada(b: Borrador, conGasto: boolean): EntradaDatos | null {
+  if (!b.meta || !b.actividad || !b.sexo) return null;
+  const analisis = EntradaSchema.safeParse({
+    meta: b.meta,
+    actividad: b.actividad,
+    ...(b.ritmo && preguntaRitmo(b.meta) ? { ritmo: b.ritmo } : {}),
+    sexo: b.sexo,
+    edad: b.edad,
+    estaturaCm: b.estatura,
+    pesoKg: b.peso,
+    ...(b.pesoMeta !== null && preguntaPesoMeta(b.meta) ? { pesoMetaKg: b.pesoMeta } : {}),
+    // Con una condición de salud solo se ofrece la forma recomendada: keto o
+    // alta en proteína no son para cualquiera.
+    dieta: b.condicion ? "recomendada" : b.dieta,
+    ...(b.fuerza !== null ? { fuerza: b.fuerza } : {}),
+    ...(conGasto && b.reloj && b.gasto !== null ? { gastoMedidoKcal: b.gasto } : {}),
+  });
+  return analisis.success ? analisis.data : null;
 }
 
 /** Peso objetivo sugerido: algo alcanzable, para que arrastrar sea afinar. */
@@ -209,23 +246,12 @@ export function Entrada({ rehacer = false, inicial }: { rehacer?: boolean; inici
 
   const cambiar = (parte: Partial<Borrador>) => setB((previo) => ({ ...previo, ...parte }));
 
-  const entrada: EntradaDatos | null = useMemo(() => {
-    if (!b.meta || !b.actividad || !b.sexo) return null;
-    const analisis = EntradaSchema.safeParse({
-      meta: b.meta,
-      actividad: b.actividad,
-      ...(b.ritmo && preguntaRitmo(b.meta) ? { ritmo: b.ritmo } : {}),
-      sexo: b.sexo,
-      edad: b.edad,
-      estaturaCm: b.estatura,
-      pesoKg: b.peso,
-      ...(b.pesoMeta !== null && preguntaPesoMeta(b.meta) ? { pesoMetaKg: b.pesoMeta } : {}),
-      // Con una condición de salud solo se ofrece la forma recomendada: keto o
-      // alta en proteína no son para cualquiera.
-      dieta: b.condicion ? "recomendada" : b.dieta,
-      ...(b.fuerza !== null ? { fuerza: b.fuerza } : {}),
-    });
-    return analisis.success ? analisis.data : null;
+  const entrada = useMemo(() => armarEntrada(b, true), [b]);
+  // El gasto que daría la fórmula sin reloj: de ahí parte el deslizador, para
+  // que arranque cerca de la respuesta y arrastrar sea afinar.
+  const gastoFormula = useMemo(() => {
+    const e = armarEntrada(b, false);
+    return e ? planDeEntrada(e).calculo.tdeeKcal : 2200;
   }, [b]);
 
   const plan = useMemo(() => (entrada ? planDeEntrada(entrada) : null), [entrada]);
@@ -248,6 +274,7 @@ export function Entrada({ rehacer = false, inicial }: { rehacer?: boolean; inici
       "estatura",
       "peso",
       ...(b.meta && preguntaPesoMeta(b.meta) ? (["pesoMeta"] as Paso[]) : []),
+      "reloj",
       "salud",
       ...(b.condicion ? [] : (["dieta"] as Paso[])),
       "fuerza",
@@ -498,6 +525,49 @@ export function Entrada({ rehacer = false, inicial }: { rehacer?: boolean; inici
           />
         )}
 
+        {paso === "reloj" && (
+          <Pregunta
+            titulo="¿Tu reloj mide cuántas calorías gastas?"
+            ayuda="Si lo sabes, calculamos tu plan con tu gasto real y no con una estimación, que puede fallar un 10 %."
+          >
+            <Opcion
+              i={0}
+              emoji="⌚"
+              titulo="Sí, tengo mi promedio"
+              detalle="Garmin, Apple Watch, Fitbit, Polar…"
+              elegida={b.reloj === true}
+              onElegir={() => cambiar({ reloj: true, gasto: b.gasto ?? gastoFormula })}
+            />
+            <Opcion
+              i={1}
+              emoji="🤷"
+              titulo="No tengo reloj o no lo sé"
+              detalle="Usamos la estimación por fórmula."
+              elegida={b.reloj === false}
+              onElegir={() => elegir({ reloj: false, gasto: null })}
+            />
+
+            {b.reloj && (
+              <div className="entra space-y-4 pt-5">
+                <SelectorNumero
+                  etiqueta="gasto diario"
+                  unidad="kcal"
+                  valor={b.gasto ?? gastoFormula}
+                  min={1400}
+                  max={4500}
+                  paso={10}
+                  onCambiar={(v) => cambiar({ gasto: v })}
+                />
+                <p className="text-center text-xs text-muted">
+                  En Garmin Connect: Calorías quemadas → 4 sem → «Media total». En otro reloj, suma las calorías en
+                  reposo y las activas de un día normal.
+                </p>
+                <Continuar onClick={avanzar} />
+              </div>
+            )}
+          </Pregunta>
+        )}
+
         {paso === "salud" && (
           <Pregunta
             titulo="¿Tienes alguna condición de salud?"
@@ -529,13 +599,21 @@ export function Entrada({ rehacer = false, inicial }: { rehacer?: boolean; inici
 
         {paso === "fuerza" && (
           <Pregunta
-            titulo="¿Haces entrenamiento de fuerza?"
-            ayuda="Pesas, bandas o tu propio peso. Es clave para calcular cuánta proteína necesitas."
+            titulo="¿Cuántas veces a la semana haces ejercicio de fuerza?"
+            ayuda="Pesas, bandas o tu propio peso. Cambia cuánta proteína necesitas, no cuántas calorías."
           >
-            <Opcion i={0} emoji="💪" titulo="Sí" elegida={b.fuerza === true} onElegir={() => elegir({ fuerza: true }, "creando")} />
-            <Opcion i={1} emoji="🚶" titulo="No" elegida={b.fuerza === false} onElegir={() => elegir({ fuerza: false }, "creando")} />
-            <p className="entra text-center text-xs text-muted" style={{ "--i": 3 } as React.CSSProperties}>
-              Si no entrenas, la proteína que necesitas es un poco menor.
+            {ORDEN_FUERZA.map((id, i) => (
+              <Opcion
+                key={id}
+                i={i}
+                emoji={EMOJI_FUERZA[id]}
+                titulo={NOMBRE_FUERZA[id]}
+                elegida={b.fuerza === id}
+                onElegir={() => elegir({ fuerza: id }, "creando")}
+              />
+            ))}
+            <p className="entra text-center text-xs text-muted" style={{ "--i": 5 } as React.CSSProperties}>
+              Con menos fuerza, el cuerpo protege menos músculo y la proteína que necesitas es un poco menor.
             </p>
           </Pregunta>
         )}

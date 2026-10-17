@@ -71,10 +71,38 @@ export const DIETAS: Record<Dieta, DefinicionDieta> = {
 
 export const ORDEN_DIETAS: Dieta[] = ["recomendada", "alta_proteina", "baja_carbs", "keto", "baja_grasa"];
 
+/** Cuántas veces a la semana entrena fuerza. */
+export type NivelFuerza = "ninguna" | "1-2" | "3-4" | "5+";
+
+export const ORDEN_FUERZA: NivelFuerza[] = ["ninguna", "1-2", "3-4", "5+"];
+
 /**
- * Sin entrenar fuerza la proteína necesaria baja: se protege menos músculo
- * porque se está estimulando menos. Se resta 0.4 g/kg, sin bajar de 1.4.
+ * Cuánta proteína baja por kg según cuánta fuerza se entrena.
+ *
+ * La proteína alta existe para proteger el músculo que se estimula; con poco
+ * estímulo hace falta menos. Con 3 o más sesiones por semana se mantiene lo de
+ * la meta, y no se sube por entrenar más: más de lo que la meta ya pide cuesta
+ * más y no rinde más.
  */
-export function proteinaSegunFuerza(base: number, fuerza: boolean | undefined): number {
-  return fuerza === false ? Math.max(1.4, Math.round((base - 0.4) * 10) / 10) : base;
+const AJUSTE_PROTEINA: Record<NivelFuerza, number> = {
+  ninguna: -0.4,
+  "1-2": -0.2,
+  "3-4": 0,
+  "5+": 0,
+};
+
+/**
+ * Acepta también el sí/no de antes de que se preguntara por días: un sí era
+ * "entrena lo suficiente" (lo de la meta) y un no era "no entrena".
+ */
+export function nivelDeFuerza(valor: boolean | NivelFuerza | undefined): NivelFuerza {
+  if (valor === undefined || valor === true) return "3-4";
+  if (valor === false) return "ninguna";
+  return valor;
+}
+
+/** La proteína por kg tras ajustar por fuerza, sin bajar de 1,4 g/kg. */
+export function proteinaSegunFuerza(base: number, fuerza: boolean | NivelFuerza | undefined): number {
+  const ajuste = AJUSTE_PROTEINA[nivelDeFuerza(fuerza)];
+  return ajuste === 0 ? base : Math.max(1.4, Math.round((base + ajuste) * 10) / 10);
 }

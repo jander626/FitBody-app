@@ -32,10 +32,15 @@ const COLUMNAS = [...IZQUIERDA, null, ...DERECHA] as const;
 export function NavegacionInferior() {
   const real = usePathname();
   // Al tocar un destino, la pastilla se mueve de una vez, sin esperar a que el
-  // servidor entregue la pantalla. Si la navegación termina en otra parte (o
-  // falla), `real` manda: solo se respeta lo pendiente mientras siga siendo
-  // el mismo punto de partida.
+  // servidor entregue la pantalla. Lo pendiente vale solo hasta que la ruta
+  // real cambie: si no se descartara ahí, volver al punto de partida (por
+  // ejemplo cerrar Registrar) reviviría un destino viejo y escondería la barra.
   const [pendiente, setPendiente] = useState<{ href: string; desde: string } | null>(null);
+  const [rutaVista, setRutaVista] = useState(real);
+  if (rutaVista !== real) {
+    setRutaVista(real);
+    setPendiente(null);
+  }
   const pathname = pendiente && pendiente.desde === real ? pendiente.href : real;
   const estaEn = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
 

@@ -35,7 +35,7 @@ export default async function Consejos() {
               comés.
             </Aviso>
             <Link
-              href="/objetivo"
+              href="/empezar?rehacer=1"
               className="mt-3 block rounded-xl bg-accent px-4 py-3 text-center text-base font-medium text-sobre-accent"
             >
               Calcular mi plan

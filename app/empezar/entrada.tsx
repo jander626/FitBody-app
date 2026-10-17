@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Aviso } from "@/components/ui";
 import { MedidorSemicirculo } from "@/components/medidor-semicirculo";
 import { Confeti, useCuenta } from "@/components/movimiento";
@@ -9,6 +10,7 @@ import { ProyeccionPeso } from "@/components/proyeccion-peso";
 import { SelectorNumero } from "@/components/selector-numero";
 import { DIETAS, ORDEN_DIETAS, type Dieta } from "@/lib/entrada/dietas";
 import { clienteNavegador } from "@/lib/supabase/cliente-navegador";
+import { rehacerPlan } from "./acciones";
 import {
   EntradaSchema,
   pesoMetaCoherente,
@@ -154,8 +156,25 @@ function metaSugerida(meta: Meta, peso: number): number {
   return meta === "ganar_musculo" ? Math.round(peso * 1.06) : Math.round(peso * 0.92);
 }
 
-export function Entrada() {
-  const [b, setB] = useState<Borrador>(VACIO);
+/** Lo que ya se sabe de quien rehace el plan: así no repite su estatura. */
+interface Inicial {
+  sexo: "hombre" | "mujer" | null;
+  edad: number | null;
+  estatura: number | null;
+  peso: number | null;
+}
+
+export function Entrada({ rehacer = false, inicial }: { rehacer?: boolean; inicial?: Inicial }) {
+  const router = useRouter();
+  const [b, setB] = useState<Borrador>(() => ({
+    ...VACIO,
+    ...(inicial?.sexo ? { sexo: inicial.sexo } : {}),
+    ...(inicial?.edad ? { edad: Math.min(90, Math.max(EDAD_MINIMA, inicial.edad)) } : {}),
+    ...(inicial?.estatura ? { estatura: Math.min(220, Math.max(130, Math.round(inicial.estatura))) } : {}),
+    ...(inicial?.peso ? { peso: Math.min(200, Math.max(40, Math.round(inicial.peso * 2) / 2)) } : {}),
+  }));
+  const [guardandoPlan, setGuardandoPlan] = useState(false);
+  const [errorPlan, setErrorPlan] = useState<string | null>(null);
   const [paso, setPaso] = useState<Paso>("meta");
   const [direccion, setDireccion] = useState<"adelante" | "atras">("adelante");
   const [listo, setListo] = useState(false);
@@ -164,13 +183,14 @@ export function Entrada() {
   // El borrador se lee después de montar: leerlo durante el render daría un
   // HTML distinto en servidor y cliente.
   useEffect(() => {
+    // Al rehacer el plan se parte de lo que ya se sabe, no de un borrador viejo.
     // eslint-disable-next-line react-hooks/set-state-in-effect -- sincroniza con localStorage, que solo existe en el cliente
-    setB(leerBorrador());
+    if (!rehacer) setB(leerBorrador());
     setListo(true);
-  }, []);
+  }, [rehacer]);
 
   useEffect(() => {
-    if (!listo) return;
+    if (!listo || rehacer) return;
     try {
       // La condición de salud no se guarda ni en el borrador: solo vive en la
       // pantalla mientras se usa para mostrar el aviso.
@@ -178,7 +198,7 @@ export function Entrada() {
     } catch {
       // Sin almacenamiento (ventana privada) el flujo sigue funcionando.
     }
-  }, [b, listo]);
+  }, [b, listo, rehacer]);
 
   useEffect(
     () => () => {
@@ -234,9 +254,10 @@ export function Entrada() {
       "creando",
       "plan",
       ...(semanas !== null ? (["proyeccion"] as Paso[]) : []),
-      "cuenta",
+      // Rehaciendo el plan ya hay cuenta: el último paso es guardar.
+      ...(rehacer ? [] : (["cuenta"] as Paso[])),
     ],
-    [b.meta, b.condicion, semanas],
+    [b.meta, b.condicion, semanas, rehacer],
   );
   const indice = pasos.indexOf(paso);
 
@@ -245,6 +266,26 @@ export function Entrada() {
     setPaso(destino);
   };
   const avanzar = () => irA(pasos[Math.min(indice + 1, pasos.length - 1)]);
+  const esUltimo = rehacer && indice === pasos.length - 1;
+
+  /** Rehacer el plan: guardar directo y volver a Hoy. */
+  async function guardarRehecho() {
+    if (!entrada) return;
+    setGuardandoPlan(true);
+    setErrorPlan(null);
+    try {
+      const resultado = await rehacerPlan(entrada);
+      if (!resultado.ok) {
+        setErrorPlan(resultado.error);
+        setGuardandoPlan(false);
+        return;
+      }
+      router.push("/hoy");
+    } catch {
+      setErrorPlan("No se pudo guardar. Intenta de nuevo.");
+      setGuardandoPlan(false);
+    }
+  }
   const volver = () => irA(pasos[Math.max(indice - 1, 0)], "atras");
 
   /** Marca la elección y avanza un instante después, para que se vea el pop. */
@@ -335,10 +376,18 @@ export function Entrada() {
               />
             ))}
             <p className="entra pt-2 text-center text-sm text-muted" style={{ "--i": 5 } as React.CSSProperties}>
-              ¿Ya tienes cuenta?{" "}
-              <Link href="/login" className="text-accent underline underline-offset-4">
-                Entrar
-              </Link>
+              {rehacer ? (
+                <Link href="/perfil" className="text-accent underline underline-offset-4">
+                  Cancelar y conservar mi plan actual
+                </Link>
+              ) : (
+                <>
+                  ¿Ya tienes cuenta?{" "}
+                  <Link href="/login" className="text-accent underline underline-offset-4">
+                    Entrar
+                  </Link>
+                </>
+              )}
             </p>
           </Pregunta>
         )}
@@ -538,7 +587,10 @@ export function Entrada() {
               </Aviso>
             ))}
 
-            <Principal onClick={avanzar}>Continuar</Principal>
+            {esUltimo && errorPlan && <Aviso nivel="error">{errorPlan}</Aviso>}
+            <Principal onClick={esUltimo ? guardarRehecho : avanzar} deshabilitado={guardandoPlan}>
+              {esUltimo ? (guardandoPlan ? "Guardando…" : "Guardar mi plan") : "Continuar"}
+            </Principal>
             <p className="text-center text-xs text-muted">
               Es un cálculo, no una verdad: un punto de partida que la app ajusta con lo que muestre tu peso. No reemplaza la
               consulta con un profesional de la salud.
@@ -562,7 +614,10 @@ export function Entrada() {
             <p className="entra text-center text-xs text-muted" style={{ "--i": 3 } as React.CSSProperties}>
               Es una estimación: tu cuerpo puede ir más rápido o más lento, y la app ajusta el plan con lo que muestre tu peso.
             </p>
-            <Principal onClick={avanzar}>Guardar mi plan</Principal>
+            {esUltimo && errorPlan && <Aviso nivel="error">{errorPlan}</Aviso>}
+            <Principal onClick={esUltimo ? guardarRehecho : avanzar} deshabilitado={guardandoPlan}>
+              {guardandoPlan ? "Guardando…" : "Guardar mi plan"}
+            </Principal>
           </div>
         )}
 

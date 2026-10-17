@@ -33,7 +33,7 @@ export default async function Hoy(props: PageProps<"/hoy">) {
   // Primera vez: sin objetivo ni comidas no hay nada que mostrar, y la pantalla
   // vacía no dice qué hacer. La encuesta arma el objetivo en un minuto.
   if (dia === hoy && !diario.objetivo && diario.comidas.length === 0) {
-    redirect("/objetivo");
+    redirect("/empezar?rehacer=1");
   }
 
   return (

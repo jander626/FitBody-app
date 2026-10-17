@@ -102,7 +102,7 @@ export function FormularioPerfil({
       <div className="rounded-xl border border-hairline-soft bg-ground px-3.5 py-3">
         <div className="flex items-baseline justify-between gap-3">
           <span className="text-sm font-medium text-ink-2">Tu plan</span>
-          <Link href="/objetivo" className="text-sm text-accent underline underline-offset-4">
+          <Link href="/empezar?rehacer=1" className="text-sm text-accent underline underline-offset-4">
             Cambiar
           </Link>
         </div>

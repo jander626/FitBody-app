@@ -83,7 +83,10 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(destino);
   }
 
-  if (user && (pathname === "/login" || pathname === "/empezar")) {
+  // Estando dentro, /empezar solo sirve para rehacer el plan: sin esa marca es
+  // la entrada de quien llega nuevo y no tiene nada que hacer ahí.
+  const rehaciendo = pathname === "/empezar" && request.nextUrl.searchParams.get("rehacer") === "1";
+  if (user && (pathname === "/login" || (pathname === "/empezar" && !rehaciendo))) {
     const destino = request.nextUrl.clone();
     destino.pathname = "/hoy";
     destino.search = "";

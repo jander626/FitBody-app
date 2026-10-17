@@ -129,7 +129,7 @@ export function VistaHoy({
               Todavía no hay un objetivo configurado. Sin él no se puede decir cuánto te queda cada día.
             </Aviso>
             <Link
-              href="/objetivo"
+              href="/empezar?rehacer=1"
               className="mt-3 block rounded-full bg-accent px-4 py-3.5 text-center text-base font-semibold text-sobre-accent"
             >
               Calcular mi plan

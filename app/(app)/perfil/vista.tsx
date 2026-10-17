@@ -105,14 +105,15 @@ export function VistaPerfil({
           <TituloSeccion>Tu objetivo</TituloSeccion>
           <Tarjeta>
             <p className="text-sm text-ink-2">
-              Contestá cuatro preguntas y la app calcula tus calorías y macros.
-              No hace falta saber qué es un factor de actividad.
+              Vuelve a contestar el cuestionario del principio y la app recalcula
+              tus calorías y macros. Tu historial de comidas y de peso se queda
+              como está.
             </p>
             <Link
-              href="/objetivo"
+              href="/empezar?rehacer=1"
               className="mt-3 block rounded-xl bg-accent px-4 py-3 text-center text-base font-medium text-sobre-accent"
             >
-              {objetivo ? "Volver a calcular mi plan" : "Calcular mi plan"}
+              {objetivo ? "Rehacer mi plan" : "Calcular mi plan"}
             </Link>
           </Tarjeta>
         </div>
